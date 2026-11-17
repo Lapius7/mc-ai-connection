@@ -2,6 +2,8 @@
   "name": "mc-ai-connection",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "author": "Lapius",
   "type": "module",
   "description": "MCP server that lets AI build and operate on a Minecraft server via RCON",
   "scripts": {

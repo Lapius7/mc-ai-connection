@@ -1,104 +1,134 @@
 # mc-ai-connection
 
-Claude や Codex などの AI から、Minecraft のサーバーに建築やコマンド操作をさせる MCP サーバーです。サーバーの RCON に接続して、コマンドを送ります。Mod は要りません。
+[日本語](README.ja.md)
 
-## 必要なもの
+An MCP server that lets AI assistants (Claude, Codex, and any other MCP client) build and operate on a Minecraft Java server. It talks to the server over RCON, so no mod is required.
 
-- Bun
-- pnpm
-- RCON を有効にした Minecraft Java 版のサーバー
+```
+AI client ──MCP (stdio)──▶ mc-ai-connection ──RCON──▶ Minecraft server
+```
 
-## セットアップ
+Ask for "a stone-brick tower next to Steve" or "a glass dome of radius 10 at the origin", and the AI turns it into commands. It has been tried on a Paper server running Minecraft 26.3, including a full cathedral build of about 700 commands.
 
-### 1. 依存を入れる
+## Requirements
+
+- [Bun](https://bun.sh) and [pnpm](https://pnpm.io)
+- A Minecraft Java server with RCON enabled
+
+## Setup
+
+### 1. Install
 
 ```sh
+git clone https://github.com/Lapius7/mc-ai-connection
+cd mc-ai-connection
 pnpm install
 ```
 
-### 2. サーバーで RCON を有効にする
+### 2. Enable RCON on the server
 
-`server.properties` に次を書き、サーバーを再起動します。
+Add this to `server.properties` and restart the server.
 
 ```properties
 enable-rcon=true
 rcon.port=25575
-rcon.password=好きなパスワード
+rcon.password=use-a-long-random-password
 ```
 
-RCON ではサーバーのコマンドをすべて実行できます。RCON のポートはインターネットに公開しないでください。同じ PC か、信頼できるネットワークの中だけで使います。
+### 3. Register it with your AI client
 
-### 3. AI に登録する
-
-Claude Code の場合です。
+Claude Code:
 
 ```sh
 claude mcp add mc \
-  -e MC_RCON_PASSWORD=好きなパスワード \
-  -- bun run /絶対パス/mc-ai-connection/src/index.ts
+  -e MC_RCON_PASSWORD=use-a-long-random-password \
+  -- bun run /absolute/path/to/mc-ai-connection/src/index.ts
 ```
 
-Codex の場合は、`~/.codex/config.toml` に追記します。
+Codex (`~/.codex/config.toml`):
 
 ```toml
 [mcp_servers.mc]
 command = "bun"
-args = ["run", "/絶対パス/mc-ai-connection/src/index.ts"]
-env = { MC_RCON_PASSWORD = "好きなパスワード" }
+args = ["run", "/absolute/path/to/mc-ai-connection/src/index.ts"]
+env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 ```
 
-ほかの MCP 対応クライアントでも、標準入出力(stdio)で `bun run src/index.ts` を起動する設定にすれば使えます。
+Any other MCP client works if it can launch `bun run src/index.ts` over stdio.
 
-## 環境変数
+### 4. Try it
 
-| 名前 | 既定値 | 内容 |
+Start the server, then ask the AI: "List the online players" or "Where is Steve standing?".
+
+## Configuration
+
+| Variable | Default | Description |
 |---|---|---|
-| `MC_RCON_HOST` | `127.0.0.1` | サーバーのホスト |
-| `MC_RCON_PORT` | `25575` | RCON のポート |
-| `MC_RCON_PASSWORD` | 空 | RCON のパスワード |
-| `MC_MAX_VOLUME` | `200000` | 1回の操作で変えてよいブロック数の上限 |
+| `MC_RCON_HOST` | `127.0.0.1` | Server host |
+| `MC_RCON_PORT` | `25575` | RCON port |
+| `MC_RCON_PASSWORD` | empty | RCON password |
+| `MC_MAX_VOLUME` | `200000` | Maximum number of blocks one operation may change |
 
-## 使い方
+## Tools
 
-AI に頼むだけです。AI はまず `get_player_pos` で基準の座標を調べてから建てます。
-
-- 「プレイヤー Steve の今いる場所の隣に、石レンガの塔を建てて」
-- 「原点に半径 10 のガラスのドームをかぶせて」
-- 「この2点の間に、オークの橋をかけて」
-- 「夜にして、雨も止めて」
-
-## ツール
-
-| ツール | 内容 |
+| Tool | Description |
 |---|---|
-| `run_command` | コマンドを1つ実行し、結果を返す。先頭の `/` は不要 |
-| `run_commands` | コマンドをまとめて実行する。最大 2000 件 |
-| `get_player_pos` | プレイヤーの座標、向き、ディメンションを返す |
-| `set_block` | ブロックを1つ置く |
-| `fill` | 直方体を埋める。`mode` は `replace` `hollow` `outline` `keep` `destroy`。大きい範囲は自動で分割する |
-| `build_sphere` | 球を作る。半径は 1〜60。`hollow` で空洞にする |
-| `build_cylinder` | 円柱を作る。半径は 1〜60、高さは 1〜320。`hollow` で空洞にする |
-| `build_line` | 2点の間に直線を引く |
+| `run_command` | Run one command and return its output. A leading `/` is optional |
+| `run_commands` | Run up to 2000 commands in order |
+| `get_player_pos` | Get a player's position, rotation, and dimension |
+| `set_block` | Place one block |
+| `fill` | Fill a box. `mode` is `replace`, `hollow`, `outline`, `keep`, or `destroy`. Large boxes are split automatically to stay under the 32768-block limit |
+| `build_sphere` | Build a sphere (radius 1 to 60), optionally hollow |
+| `build_cylinder` | Build a cylinder (radius 1 to 60, height 1 to 320), optionally hollow |
+| `build_line` | Draw a 3D line between two points |
 
-座標はすべて整数の絶対座標で、`[x, y, z]` の形で渡します。ブロックは `stone` や `oak_stairs[facing=north]` のように、ブロックの状態も含めて書けます。
+Coordinates are absolute integers in the form `[x, y, z]`. Blocks accept block states, such as `oak_stairs[facing=north]`. Shape tools return a short summary (commands run, succeeded, sample failures) instead of dumping every response.
 
-ツールの結果は実行した件数、成功した件数、失敗の例だけを返します。
+`run_command` can run any command the server console can, so the AI can also change the time, weather, game rules, and entities, give items, and teleport players.
 
-## 制限と注意
+## How an AI builds
 
-- `undo`(元に戻す)はありません。大きな建築の前に、ワールドのバックアップを取ってください。
-- 1回の体積が `MC_MAX_VOLUME` を超える操作は、実行せずに断ります。
-- `run_command` では `stop` や `ban` などの危険なコマンドも通ります。接続先は自分のサーバーだけにしてください。
-- 実行できるのはサーバー側のコマンドだけです。プレイヤーの視点や移動、スクリーンショットなど、クライアント側の操作はできません。
-- 偽の RCON サーバーとの疎通は確かめましたが、Minecraft 26.3 の実機ではまだ試していません。
+1. It calls `get_player_pos` to find a base coordinate.
+2. It picks shapes (`fill`, `build_sphere`, ...) and, for fine detail, sends many commands through `run_commands`.
+3. It checks results with commands such as `execute if block x y z <block>`, which return "Test passed" or "Test failed".
 
-## 開発
+## Troubleshooting
+
+**`Failed to connect`**
+
+- The server is not running, or RCON is not enabled. Check that `enable-rcon=true` is set and the server was restarted.
+- The host is wrong. If the server runs on Windows and the AI runs in WSL2, `127.0.0.1` may not reach it. Use the Windows host IP (the default gateway shown by `ip route show default`) as `MC_RCON_HOST`, or switch WSL to mirrored networking (`networkingMode=mirrored` in `.wslconfig`).
+
+**Command syntax errors**
+
+Command syntax changes between Minecraft versions. For example, in 26.x `time query daytime` no longer exists and you use `time query day`. Let the AI read the error and retry, or ask it to check the command with `run_command` first.
+
+## Safety
+
+- RCON is unencrypted and has full control of the server. Never expose the RCON port to the internet. Use a strong password and a firewall.
+- `run_command` also allows dangerous commands such as `stop`, `op`, and `ban`. Only connect to servers you own.
+- There is no undo. Back up the world before large builds. `MC_MAX_VOLUME` refuses oversized single operations.
+- Only server-side commands are available. Client-side actions such as camera, movement, and screenshots are out of scope.
+
+## Development
 
 ```sh
-pnpm check   # 型チェック
-pnpm start   # MCP サーバーを起動(標準入出力で待ち受ける)
+pnpm check   # type check
+pnpm start   # start the MCP server on stdio
 ```
 
-- `src/rcon.ts` は RCON クライアントです。
-- `src/builders.ts` は、形状をコマンド列に変える関数です。
-- `src/index.ts` は MCP のツール定義です。
+| File | Role |
+|---|---|
+| `src/rcon.ts` | Minimal RCON client |
+| `src/builders.ts` | Pure functions that turn shapes into command lists |
+| `src/index.ts` | MCP tool definitions |
+
+## Roadmap
+
+- Undo by saving a region before it is overwritten
+- A command allow list and deny list
+- A companion MCP that reports a user's installed mods
+
+## License
+
+[MIT](LICENSE)
