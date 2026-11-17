@@ -60,6 +60,20 @@ Any other MCP client works if it can launch `bun run src/index.ts` over stdio.
 
 Start the server, then ask the AI: "List the online players" or "Where is Steve standing?".
 
+## Multiple servers
+
+Register several servers in `~/.config/mc-ai-connection/servers.json` (override the path with `MC_SERVERS_FILE`). See [`servers.example.json`](servers.example.json). Keep the file private (`chmod 600`).
+
+| Field | Description |
+|---|---|
+| `host`, `port` | RCON address. With `ssh`, this is seen from the SSH host |
+| `password` / `passwordEnv` | The password, or the name of an environment variable that holds it |
+| `ssh` | Optional. An SSH host from `~/.ssh/config`. The MCP opens a tunnel, so the RCON port never has to be exposed |
+| `description` | Free text shown by `list_servers` |
+| `default` (top level) | The server used when a call has no `server` |
+
+Every tool takes an optional `server` argument. `list_servers` shows what is registered, and `use_server` changes the default until the MCP restarts. Without the file, the `MC_RCON_*` variables below define a single server named `default`, as before. With the file, they are ignored.
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -73,6 +87,8 @@ Start the server, then ask the AI: "List the online players" or "Where is Steve 
 
 | Tool | Description |
 |---|---|
+| `list_servers` | List the registered servers and the current default |
+| `use_server` | Change the default server |
 | `run_command` | Run one command and return its output. A leading `/` is optional |
 | `run_commands` | Run up to 2000 commands in order |
 | `get_player_pos` | Get a player's position, rotation, and dimension |
@@ -120,6 +136,7 @@ pnpm start   # start the MCP server on stdio
 | File | Role |
 |---|---|
 | `src/rcon.ts` | Minimal RCON client |
+| `src/servers.ts` | Server registry, config file, SSH tunnels |
 | `src/builders.ts` | Pure functions that turn shapes into command lists |
 | `src/index.ts` | MCP tool definitions |
 

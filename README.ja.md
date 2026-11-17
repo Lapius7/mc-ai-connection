@@ -60,6 +60,20 @@ env = { MC_RCON_PASSWORD = "長くてランダムなパスワード" }
 
 サーバーを起動してから、AI に「オンラインのプレイヤーを教えて」「Steve はどこにいる?」と頼んでください。
 
+## 複数のサーバー
+
+`~/.config/mc-ai-connection/servers.json` に複数のサーバーを登録できます(場所は `MC_SERVERS_FILE` で変えられます)。書き方は [`servers.example.json`](servers.example.json) を見てください。パスワードが入るので、ファイルは自分だけが読めるようにします(`chmod 600`)。
+
+| 項目 | 内容 |
+|---|---|
+| `host`, `port` | RCON のアドレス。`ssh` を指定したときは、SSH 先から見たアドレス |
+| `password` / `passwordEnv` | パスワード、またはパスワードを入れた環境変数の名前 |
+| `ssh` | 任意。`~/.ssh/config` のホスト名。MCP がトンネルを張るので、RCON のポートを公開しなくて済みます |
+| `description` | `list_servers` に出る説明 |
+| `default`(最上位) | 呼び出しに `server` がないときに使うサーバー |
+
+どのツールにも、任意の `server` 引数があります。`list_servers` で登録済みのサーバーを確認でき、`use_server` で既定のサーバーを切り替えられます(MCP を再起動するまで有効)。設定ファイルがなければ、これまでどおり次の `MC_RCON_*` で `default` という1台だけを登録した扱いになります。設定ファイルがあるときは、`MC_RCON_*` は使われません。
+
 ## 環境変数
 
 | 名前 | 既定値 | 内容 |
@@ -73,6 +87,8 @@ env = { MC_RCON_PASSWORD = "長くてランダムなパスワード" }
 
 | ツール | 内容 |
 |---|---|
+| `list_servers` | 登録済みのサーバーと、現在の既定を一覧する |
+| `use_server` | 既定のサーバーを切り替える |
 | `run_command` | コマンドを1つ実行し、出力を返す。先頭の `/` は省略できる |
 | `run_commands` | コマンドを順に最大 2000 件実行する |
 | `get_player_pos` | プレイヤーの座標、向き、ディメンションを返す |
@@ -120,6 +136,7 @@ pnpm start   # MCP サーバーを起動(標準入出力で待ち受ける)
 | ファイル | 役割 |
 |---|---|
 | `src/rcon.ts` | 最小限の RCON クライアント |
+| `src/servers.ts` | サーバーの登録、設定ファイル、SSH トンネル |
 | `src/builders.ts` | 形状をコマンド列に変える関数 |
 | `src/index.ts` | MCP のツール定義 |
 
