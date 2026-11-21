@@ -1,4 +1,11 @@
-# mc-ai-connection
+# mcp-minecraft-controller
+
+[![Release](https://img.shields.io/github/v/release/Lapius7/mcp-minecraft-controller)](https://github.com/Lapius7/mcp-minecraft-controller/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/Lapius7/mcp-minecraft-controller/ci.yml?branch=main&label=CI)](https://github.com/Lapius7/mcp-minecraft-controller/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/Lapius7/mcp-minecraft-controller)](LICENSE)
+[![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun&logoColor=black)](https://bun.sh)
+[![MCP](https://img.shields.io/badge/protocol-MCP-6b46c1)](https://modelcontextprotocol.io)
+[![Minecraft Java](https://img.shields.io/badge/Minecraft-Java%20Edition-62b47a)](https://www.minecraft.net)
 
 [English](README.md)
 
@@ -21,7 +28,10 @@ Claude や Codex などの AI から、Minecraft Java 版のサーバーで建�
 
 ### 検証の範囲
 
-単体テスト(`pnpm test`)は、サーバーなしの疑似ワールドで動かします。実際のサーバーでの動作確認は、作者が Minecraft 26.3 の Paper サーバーで行ったものだけです。約 700 コマンドの大聖堂も建てられました。ほかのサーバーソフトやバージョンは未検証です。カメラ、移動、スクリーンショットなど、クライアント側の操作は対象外です。
+単体テスト(`pnpm test`)は、サーバーなしの疑似ワールドで動かします。
+
+> [!NOTE]
+> 実際のサーバーでの動作確認は、作者が Minecraft 26.3 の Paper サーバーで行ったものだけです。約 700 コマンドの大聖堂も建てられました。ほかのサーバーソフトやバージョンは未検証です。カメラ、移動、スクリーンショットなど、クライアント側の操作は対象外です。
 
 ## 最短セットアップ
 
@@ -30,8 +40,8 @@ Claude や Codex などの AI から、Minecraft Java 版のサーバーで建�
 **1. インストール**
 
 ```sh
-git clone https://github.com/Lapius7/mc-ai-connection
-cd mc-ai-connection
+git clone https://github.com/Lapius7/mcp-minecraft-controller
+cd mcp-minecraft-controller
 pnpm install
 ```
 
@@ -48,7 +58,7 @@ rcon.password=use-a-long-random-password
 ```sh
 claude mcp add mc \
   -e MC_RCON_PASSWORD=use-a-long-random-password \
-  -- bun run /absolute/path/to/mc-ai-connection/src/index.ts
+  -- bun run /absolute/path/to/mcp-minecraft-controller/src/index.ts
 ```
 
 Codex では `~/.codex/config.toml` に次を書きます。
@@ -56,7 +66,7 @@ Codex では `~/.codex/config.toml` に次を書きます。
 ```toml
 [mcp_servers.mc]
 command = "bun"
-args = ["run", "/absolute/path/to/mc-ai-connection/src/index.ts"]
+args = ["run", "/absolute/path/to/mcp-minecraft-controller/src/index.ts"]
 env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 ```
 
@@ -92,6 +102,9 @@ env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 
 `set_block` `fill` `build_*` には `dryRun: true` を渡せます。何も実行せず、コマンド数、変わりうる最大のブロック数、範囲だけを返します。
 
+> [!TIP]
+> 大きな建築は、先に `dryRun: true` で規模と範囲を確かめてから実行すると安心です。
+
 座標は `[x, y, z]` の整数の絶対座標です。ブロックは `oak_stairs[facing=north]` のように状態も指定できます。形状ツールはすべての応答を返さず、実行数・成功数・失敗の例だけを返します。
 
 `run_command` はサーバーのコンソールで打てるコマンドをすべて実行できます。時刻、天気、ゲームルール、エンティティの変更、アイテムの付与、テレポートなども AI に頼めます。
@@ -104,10 +117,16 @@ env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 
 ## 安全のために
 
-- RCON は暗号化されず、サーバーを完全に操作できます。RCON のポートをインターネットに公開しないでください。長いパスワードとファイアウォールを使ってください。
-- `stop` `op` `ban` などのコマンドは、既定で拒否します(設定ファイルを参照)。自分のサーバーにだけつないでください。AI にさせたくないことが多いなら、`commands.allow` で絞ります。
-- `undo` で戻せるのは `set_block` `fill` `build_*` だけです。大きな建築の前と、`run_command` で行う操作の前には、ワールドのバックアップを取ってください。上限を超える1回の操作は `MC_MAX_VOLUME` で断ります。
-- 使えるのはサーバー側のコマンドだけです。視点、移動、スクリーンショットなどのクライアント側の操作はできません。
+> [!WARNING]
+> RCON は暗号化されず、サーバーを完全に操作できます。RCON のポートをインターネットに公開しないでください。長いパスワードとファイアウォールを使ってください。
+
+> [!IMPORTANT]
+> `stop` `op` `ban` などのコマンドは、既定で拒否します(設定ファイルを参照)。自分のサーバーにだけつないでください。AI にさせたくないことが多いなら、`commands.allow` で絞ります。
+
+> [!NOTE]
+> `undo` で戻せるのは `set_block` `fill` `build_*` だけです。大きな建築の前と、`run_command` で行う操作の前には、ワールドのバックアップを取ってください。上限を超える1回の操作は `MC_MAX_VOLUME` で断ります。
+
+使えるのはサーバー側のコマンドだけです。視点、移動、スクリーンショットなどのクライアント側の操作はできません。
 
 ## 複数のサーバー
 
@@ -138,6 +157,9 @@ env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 ## 設定ファイル
 
 動作の設定は `~/.config/mc-ai-connection/config.json` に書きます(場所は `MC_CONFIG_FILE` で変えられます)。書き方は [`config.example.json`](config.example.json) を見てください。項目はすべて省略できます。
+
+> [!NOTE]
+> ディレクトリ名は、プロジェクトの旧名のまま `mc-ai-connection` です。既存の設定を壊さないために変えていません。
 
 | 項目 | 既定値 | 内容 |
 |---|---|---|

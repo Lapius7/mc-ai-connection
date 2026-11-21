@@ -1,4 +1,11 @@
-# mc-ai-connection
+# mcp-minecraft-controller
+
+[![Release](https://img.shields.io/github/v/release/Lapius7/mcp-minecraft-controller)](https://github.com/Lapius7/mcp-minecraft-controller/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/Lapius7/mcp-minecraft-controller/ci.yml?branch=main&label=CI)](https://github.com/Lapius7/mcp-minecraft-controller/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/Lapius7/mcp-minecraft-controller)](LICENSE)
+[![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun&logoColor=black)](https://bun.sh)
+[![MCP](https://img.shields.io/badge/protocol-MCP-6b46c1)](https://modelcontextprotocol.io)
+[![Minecraft Java](https://img.shields.io/badge/Minecraft-Java%20Edition-62b47a)](https://www.minecraft.net)
 
 [日本語](README.ja.md)
 
@@ -21,7 +28,10 @@ Ask for "a stone-brick tower next to Steve" or "a glass dome of radius 10 at the
 
 ### What is verified
 
-The unit tests (`pnpm test`) run against a fake world, with no server. The author has run it on one setup: a Paper server on Minecraft 26.3, including a cathedral of about 700 commands. Other server software and versions are not verified. Client-side actions such as camera, movement, and screenshots are out of scope.
+The unit tests (`pnpm test`) run against a fake world, with no server.
+
+> [!NOTE]
+> The author has run it on one real setup only: a Paper server on Minecraft 26.3, including a cathedral of about 700 commands. Other server software and versions are not verified. Client-side actions such as camera, movement, and screenshots are out of scope.
 
 ## Quick start
 
@@ -30,8 +40,8 @@ You need [Bun](https://bun.sh), [pnpm](https://pnpm.io), and a Minecraft Java se
 **1. Install**
 
 ```sh
-git clone https://github.com/Lapius7/mc-ai-connection
-cd mc-ai-connection
+git clone https://github.com/Lapius7/mcp-minecraft-controller
+cd mcp-minecraft-controller
 pnpm install
 ```
 
@@ -48,7 +58,7 @@ rcon.password=use-a-long-random-password
 ```sh
 claude mcp add mc \
   -e MC_RCON_PASSWORD=use-a-long-random-password \
-  -- bun run /absolute/path/to/mc-ai-connection/src/index.ts
+  -- bun run /absolute/path/to/mcp-minecraft-controller/src/index.ts
 ```
 
 For Codex, add this to `~/.codex/config.toml`:
@@ -56,7 +66,7 @@ For Codex, add this to `~/.codex/config.toml`:
 ```toml
 [mcp_servers.mc]
 command = "bun"
-args = ["run", "/absolute/path/to/mc-ai-connection/src/index.ts"]
+args = ["run", "/absolute/path/to/mcp-minecraft-controller/src/index.ts"]
 env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 ```
 
@@ -92,6 +102,9 @@ Any other MCP client works if it can launch `bun run src/index.ts` over stdio.
 
 `set_block`, `fill`, and `build_*` take `dryRun: true`, which runs nothing and returns the command count, the most blocks that could change, and the bounding box.
 
+> [!TIP]
+> Run a large build with `dryRun: true` first to check its size and bounding box before anything is written.
+
 Coordinates are absolute integers in the form `[x, y, z]`. Blocks accept block states, such as `oak_stairs[facing=north]`. Shape tools return a short summary (commands run, succeeded, sample failures) instead of dumping every response.
 
 `run_command` can run any command the server console can, so the AI can also change the time, weather, game rules, and entities, give items, and teleport players.
@@ -104,10 +117,16 @@ Coordinates are absolute integers in the form `[x, y, z]`. Blocks accept block s
 
 ## Safety
 
-- RCON is unencrypted and has full control of the server. Never expose the RCON port to the internet. Use a strong password and a firewall.
-- `stop`, `op`, `ban`, and similar commands are refused by default (see the settings file). Only connect to servers you own, and tighten `commands.allow` if the AI should do less.
-- `undo` covers `set_block`, `fill`, and `build_*` only. Back up the world before large builds, and before anything done through `run_command`. `MC_MAX_VOLUME` refuses oversized single operations.
-- Only server-side commands are available. Client-side actions such as camera, movement, and screenshots are out of scope.
+> [!WARNING]
+> RCON is unencrypted and has full control of the server. Never expose the RCON port to the internet. Use a strong password and a firewall.
+
+> [!IMPORTANT]
+> `stop`, `op`, `ban`, and similar commands are refused by default (see the settings file). Only connect to servers you own, and tighten `commands.allow` if the AI should do less.
+
+> [!NOTE]
+> `undo` covers `set_block`, `fill`, and `build_*` only. Back up the world before large builds, and before anything done through `run_command`. `MC_MAX_VOLUME` refuses oversized single operations.
+
+Only server-side commands are available. Client-side actions such as camera, movement, and screenshots are out of scope.
 
 ## Multiple servers
 
@@ -138,6 +157,9 @@ Every tool takes an optional `server` argument. `list_servers` shows what is reg
 ## Settings file
 
 Behavior settings live in `~/.config/mc-ai-connection/config.json` (override the path with `MC_CONFIG_FILE`). See [`config.example.json`](config.example.json). Every field is optional.
+
+> [!NOTE]
+> The directory is still named `mc-ai-connection`, after the project's old name. It is kept so that existing settings keep working.
 
 | Field | Default | Description |
 |---|---|---|
