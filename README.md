@@ -69,6 +69,7 @@ Register several servers in `~/.config/mc-ai-connection/servers.json` (override 
 | `host`, `port` | RCON address. With `ssh`, this is seen from the SSH host |
 | `password` / `passwordEnv` | The password, or the name of an environment variable that holds it |
 | `ssh` | Optional. An SSH host from `~/.ssh/config`. The MCP opens a tunnel, so the RCON port never has to be exposed |
+| `version` | Optional. The Minecraft version (for example `1.21.4`, `26.1`). Enables block-name and height checks and renames; see "Versions" below. For the single-server environment setup, use `MC_VERSION` |
 | `description` | Free text shown by `list_servers` |
 | `default` (top level) | The server used when a call has no `server` |
 
@@ -151,6 +152,16 @@ Coordinates are absolute integers in the form `[x, y, z]`. Blocks accept block s
 
 Command syntax changes between Minecraft versions. For example, in 26.x `time query daytime` no longer exists and you use `time query day`. Let the AI read the error and retry, or ask it to check the command with `run_command` first.
 
+## Versions
+
+When a server has a `version`, the write tools (`set_block`, `fill`, `build_*`, `copy_region`, `paste_schematic`) check the commands before anything is written, and the dry run shows the same result:
+
+- **Block names**: a name that does not exist in that version is rejected with a "did you mean" hint. The lists come from [minecraft-data](https://github.com/PrismarineJS/minecraft-data) for 1.16.5 through 26.1 (`bun scripts/gen-blocks.ts` regenerates `src/blocks.data.ts`). For a version between two listed ones (such as 1.21.2), a name is accepted if either neighbor has it. Versions older or newer than the list are not checked (a note says so). Names from other namespaces and `#tags` are not checked.
+- **Renamed blocks** are translated to the name that version uses: `grass_path`/`dirt_path` (1.17), `grass`/`short_grass` (1.20.3), `chain`/`iron_chain` (1.21.9). This works in both directions.
+- **Height**: 0 to 255 before 1.18, -64 to 319 from 1.18.
+
+`run_command` and `run_commands` are not translated; their command text is sent as written. Without a `version`, nothing is checked. The version is not detected from the server, because RCON has no vanilla command for it.
+
 ## Block palettes
 
 Where a tool takes `block` (`set_block`, `fill`, `build_sphere`, `build_cylinder`, `build_line`), you can pass a list instead of one name to mix blocks by ratio:
@@ -202,6 +213,7 @@ pnpm start   # start the MCP server on stdio
 | `src/palette.ts` | Mix blocks by ratio |
 | `src/copy.ts` | Copy/paste with rotation and flips as `clone` commands |
 | `src/nbt.ts`, `src/schematic.ts` | Read `.schem` / `.nbt` into `fill` / `setblock` |
+| `src/versions.ts`, `src/validate.ts` | Per-version block names, renames and height checks |
 | `src/shapes.ts` | Pyramid, arch, spiral stairs, roof, walls with windows |
 | `src/oplog.ts` | Operation log file |
 | `src/inspect.ts` | Block counts for a region |
@@ -210,8 +222,7 @@ pnpm start   # start the MCP server on stdio
 
 ## Roadmap
 
-- Check block names per Minecraft version before running
-- Absorb command syntax differences between versions
+- Translate command syntax differences for `run_command` (the write tools already handle block names, renames and heights)
 - Progress notifications during long builds
 - A companion MCP that reports a user's installed mods
 
