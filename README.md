@@ -2,22 +2,34 @@
 
 [日本語](README.ja.md)
 
-An MCP server that lets AI assistants (Claude, Codex, and any other MCP client) build and operate on a Minecraft Java server. It talks to the server over RCON, so no mod is required.
+An MCP server that lets AI assistants (Claude, Codex, and any other MCP client) build and operate on a Minecraft Java server over RCON. No mod is required.
 
-```
-AI client ──MCP (stdio)──▶ mc-ai-connection ──RCON──▶ Minecraft server
-```
+![AI client, MCP server, RCON, Minecraft server, drawn as isometric wireframe blocks](docs/images/flow.png)
 
-Ask for "a stone-brick tower next to Steve" or "a glass dome of radius 10 at the origin", and the AI turns it into commands. It has been tried on a Paper server running Minecraft 26.3, including a full cathedral build of about 700 commands.
+Ask for "a stone-brick tower next to Steve" or "a glass dome of radius 10 at the origin", and the AI turns it into server commands.
 
-## Requirements
+![A block tower and a stepped pyramid in isometric wireframe](docs/images/builds.png)
 
-- [Bun](https://bun.sh) and [pnpm](https://pnpm.io)
-- A Minecraft Java server with RCON enabled
+## Highlights
 
-## Setup
+- Shapes: `fill`, sphere, cylinder, line, pyramid, arch, spiral stairs, roof, and walls with windows. Large areas are split automatically to stay under the `/fill` limit of 32768 blocks.
+- Palettes: mix blocks by ratio with a `seed`, so a dry run and the real run match.
+- Schematics and copy: paste `.schem` (Sponge v2/v3) and structure `.nbt` files, and copy regions with rotation and flips.
+- Undo: `set_block`, `fill`, and `build_*` are backed up first and can be undone, newest first.
+- Dry run: shows the command count, the most blocks that could change, and the bounding box before anything runs.
+- Version checks: with a `version`, block names, renames, and build height are checked before writing.
+- Multiple servers, optionally through an SSH tunnel.
+- Command policy and an operation log: dangerous commands such as `stop`, `op`, and `ban` are refused by default.
 
-### 1. Install
+### What is verified
+
+The unit tests (`pnpm test`) run against a fake world, with no server. The author has run it on one setup: a Paper server on Minecraft 26.3, including a cathedral of about 700 commands. Other server software and versions are not verified. Client-side actions such as camera, movement, and screenshots are out of scope.
+
+## Quick start
+
+You need [Bun](https://bun.sh), [pnpm](https://pnpm.io), and a Minecraft Java server with RCON enabled.
+
+**1. Install**
 
 ```sh
 git clone https://github.com/Lapius7/mc-ai-connection
@@ -25,9 +37,7 @@ cd mc-ai-connection
 pnpm install
 ```
 
-### 2. Enable RCON on the server
-
-Add this to `server.properties` and restart the server.
+**2. Enable RCON** in `server.properties`, then restart the server.
 
 ```properties
 enable-rcon=true
@@ -35,9 +45,7 @@ rcon.port=25575
 rcon.password=use-a-long-random-password
 ```
 
-### 3. Register it with your AI client
-
-Claude Code:
+**3. Register it with your AI client.** For Claude Code, run:
 
 ```sh
 claude mcp add mc \
@@ -45,7 +53,7 @@ claude mcp add mc \
   -- bun run /absolute/path/to/mc-ai-connection/src/index.ts
 ```
 
-Codex (`~/.codex/config.toml`):
+For Codex, add this to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.mc]
@@ -56,9 +64,52 @@ env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 
 Any other MCP client works if it can launch `bun run src/index.ts` over stdio.
 
-### 4. Try it
+**4. Try it.** Start the server and ask the AI: "List the online players" or "Where is Steve standing?".
 
-Start the server, then ask the AI: "List the online players" or "Where is Steve standing?".
+## Tools
+
+| Tool | Description |
+|---|---|
+| `list_servers` | List the registered servers and the current default |
+| `use_server` | Change the default server |
+| `run_command` | Run one command and return its output. A leading `/` is optional |
+| `run_commands` | Run up to 2000 commands in order |
+| `get_player_pos` | Get a player's position, rotation, and dimension |
+| `set_block` | Place one block |
+| `fill` | Fill a box. `mode` is `replace`, `hollow`, `outline`, `keep`, or `destroy`. Large boxes are split automatically to stay under the 32768-block limit |
+| `build_sphere` | Build a sphere (radius 1 to 60), optionally hollow |
+| `build_cylinder` | Build a cylinder (radius 1 to 60, height 1 to 320), optionally hollow |
+| `build_line` | Draw a 3D line between two points |
+| `build_pyramid` | Square pyramid (optionally hollow) |
+| `build_arch` | Semicircular arch with legs, thickness and depth |
+| `build_spiral_stairs` | Spiral stairs around an optional center pillar (one block up per step) |
+| `build_roof` | Gable or hip roof; `stairBlock` makes the gable slopes from facing stairs |
+| `copy_region` | Copy a region to another place with 90° rotation and x/z flips (server-side `clone`; block facing is not rotated) |
+| `paste_schematic` | Paste a `.schem` (Sponge v2/v3) or structure `.nbt` file at given coordinates (block entity NBT such as chest contents is not pasted) |
+| `build_walls` | Four walls with evenly spaced windows and a door opening (air; no door block) |
+| `undo` | Undo the latest writes (`steps` = how many). Newest first only |
+| `list_history` | List the writes `undo` can restore, per server |
+| `operation_log` | Show the latest log entries (runs, dry runs, refusals, failures, undos) |
+| `inspect_region` | Count blocks by type in a region (read only) |
+
+`set_block`, `fill`, and `build_*` take `dryRun: true`, which runs nothing and returns the command count, the most blocks that could change, and the bounding box.
+
+Coordinates are absolute integers in the form `[x, y, z]`. Blocks accept block states, such as `oak_stairs[facing=north]`. Shape tools return a short summary (commands run, succeeded, sample failures) instead of dumping every response.
+
+`run_command` can run any command the server console can, so the AI can also change the time, weather, game rules, and entities, give items, and teleport players.
+
+## How an AI builds
+
+1. It calls `get_player_pos` to find a base coordinate.
+2. It picks shapes (`fill`, `build_sphere`, ...) and, for fine detail, sends many commands through `run_commands`.
+3. It checks results with commands such as `execute if block x y z <block>`, which return "Test passed" or "Test failed".
+
+## Safety
+
+- RCON is unencrypted and has full control of the server. Never expose the RCON port to the internet. Use a strong password and a firewall.
+- `stop`, `op`, `ban`, and similar commands are refused by default (see the settings file). Only connect to servers you own, and tighten `commands.allow` if the AI should do less.
+- `undo` covers `set_block`, `fill`, and `build_*` only. Back up the world before large builds, and before anything done through `run_command`. `MC_MAX_VOLUME` refuses oversized single operations.
+- Only server-side commands are available. Client-side actions such as camera, movement, and screenshots are out of scope.
 
 ## Multiple servers
 
@@ -103,55 +154,6 @@ Behavior settings live in `~/.config/mc-ai-connection/config.json` (override the
 
 The lists apply to the commands you or the AI ask for: `run_command`, `run_commands`, and the ones that `fill` and `build_*` generate, including the command after `run` in `execute ... run <command>`. The MCP's own internal commands (the `clone` and `forceload` that undo and `inspect_region` use, and the `data get` behind `get_player_pos`) are not checked, so a deny rule on `clone` does not break undo. The history lives in `MC_STATE_DIR` (default `~/.local/state/mc-ai-connection`).
 
-## Tools
-
-| Tool | Description |
-|---|---|
-| `list_servers` | List the registered servers and the current default |
-| `use_server` | Change the default server |
-| `run_command` | Run one command and return its output. A leading `/` is optional |
-| `run_commands` | Run up to 2000 commands in order |
-| `get_player_pos` | Get a player's position, rotation, and dimension |
-| `set_block` | Place one block |
-| `fill` | Fill a box. `mode` is `replace`, `hollow`, `outline`, `keep`, or `destroy`. Large boxes are split automatically to stay under the 32768-block limit |
-| `build_sphere` | Build a sphere (radius 1 to 60), optionally hollow |
-| `build_cylinder` | Build a cylinder (radius 1 to 60, height 1 to 320), optionally hollow |
-| `build_line` | Draw a 3D line between two points |
-| `build_pyramid` | Square pyramid (optionally hollow) |
-| `build_arch` | Semicircular arch with legs, thickness and depth |
-| `build_spiral_stairs` | Spiral stairs around an optional center pillar (one block up per step) |
-| `build_roof` | Gable or hip roof; `stairBlock` makes the gable slopes from facing stairs |
-| `copy_region` | Copy a region to another place with 90° rotation and x/z flips (server-side `clone`; block facing is not rotated) |
-| `paste_schematic` | Paste a `.schem` (Sponge v2/v3) or structure `.nbt` file at given coordinates (block entity NBT such as chest contents is not pasted) |
-| `build_walls` | Four walls with evenly spaced windows and a door opening (air; no door block) |
-| `undo` | Undo the latest writes (`steps` = how many). Newest first only |
-| `list_history` | List the writes `undo` can restore, per server |
-| `operation_log` | Show the latest log entries (runs, dry runs, refusals, failures, undos) |
-| `inspect_region` | Count blocks by type in a region (read only) |
-
-`set_block`, `fill`, and `build_*` take `dryRun: true`, which runs nothing and returns the command count, the most blocks that could change, and the bounding box.
-
-Coordinates are absolute integers in the form `[x, y, z]`. Blocks accept block states, such as `oak_stairs[facing=north]`. Shape tools return a short summary (commands run, succeeded, sample failures) instead of dumping every response.
-
-`run_command` can run any command the server console can, so the AI can also change the time, weather, game rules, and entities, give items, and teleport players.
-
-## How an AI builds
-
-1. It calls `get_player_pos` to find a base coordinate.
-2. It picks shapes (`fill`, `build_sphere`, ...) and, for fine detail, sends many commands through `run_commands`.
-3. It checks results with commands such as `execute if block x y z <block>`, which return "Test passed" or "Test failed".
-
-## Troubleshooting
-
-**`Failed to connect`**
-
-- The server is not running, or RCON is not enabled. Check that `enable-rcon=true` is set and the server was restarted.
-- The host is wrong. If the server runs on Windows and the AI runs in WSL2, `127.0.0.1` may not reach it. Use the Windows host IP (the default gateway shown by `ip route show default`) as `MC_RCON_HOST`, or switch WSL to mirrored networking (`networkingMode=mirrored` in `.wslconfig`).
-
-**Command syntax errors**
-
-Command syntax changes between Minecraft versions. For example, in 26.x `time query daytime` no longer exists and you use `time query day`. Let the AI read the error and retry, or ask it to check the command with `run_command` first.
-
 ## Versions
 
 When a server has a `version`, the write tools (`set_block`, `fill`, `build_*`, `copy_region`, `paste_schematic`) check the commands before anything is written, and the dry run shows the same result:
@@ -162,10 +164,6 @@ When a server has a `version`, the write tools (`set_block`, `fill`, `build_*`, 
 
 `run_command` and `run_commands` are not translated; their command text is sent as written. Without a `version`, nothing is checked. The version is not detected from the server, because RCON has no vanilla command for it.
 
-## Progress
-
-For long operations (the write tools and `run_commands`), the server sends MCP `notifications/progress` while commands run, roughly every 5% or every second. A client only gets them if it sends a `progressToken` with the call; clients that do not are unaffected. The count is commands run, not blocks. The backup step before a write does not report progress.
-
 ## Block palettes
 
 Where a tool takes `block` (`set_block`, `fill`, `build_sphere`, `build_cylinder`, `build_line`), you can pass a list instead of one name to mix blocks by ratio:
@@ -175,6 +173,10 @@ Where a tool takes `block` (`set_block`, `fill`, `build_sphere`, `build_cylinder
 ```
 
 `weight` is relative (it need not add up to 100). The same `seed` gives the same pattern, so a dry run and the real run match. A palette places blocks one by one (runs of the same block are merged into one `fill`), so it is capped by `MC_MAX_PALETTE_BLOCKS`. With `fill`, `mode` can be `replace`, `hollow`, or `outline`.
+
+## Progress
+
+For long operations (the write tools and `run_commands`), the server sends MCP `notifications/progress` while commands run, roughly every 5% or every second. A client only gets them if it sends a `progressToken` with the call; clients that do not are unaffected. The count is commands run, not blocks. The backup step before a write does not report progress.
 
 ## Operation log
 
@@ -190,12 +192,16 @@ Before `set_block`, `fill`, and `build_*` write, the MCP copies the region to a 
 - `run_command` and `run_commands` are **not** covered. The MCP cannot know what an arbitrary command changes. Build the part you may want back with `fill` or `build_*`.
 - Entities (mobs, dropped items) are not saved.
 
-## Safety
+## Troubleshooting
 
-- RCON is unencrypted and has full control of the server. Never expose the RCON port to the internet. Use a strong password and a firewall.
-- `stop`, `op`, `ban`, and similar commands are refused by default (see the settings file). Only connect to servers you own, and tighten `commands.allow` if the AI should do less.
-- `undo` covers `set_block`, `fill`, and `build_*` only. Back up the world before large builds, and before anything done through `run_command`. `MC_MAX_VOLUME` refuses oversized single operations.
-- Only server-side commands are available. Client-side actions such as camera, movement, and screenshots are out of scope.
+**`Failed to connect`**
+
+- The server is not running, or RCON is not enabled. Check that `enable-rcon=true` is set and the server was restarted.
+- The host is wrong. If the server runs on Windows and the AI runs in WSL2, `127.0.0.1` may not reach it. Use the Windows host IP (the default gateway shown by `ip route show default`) as `MC_RCON_HOST`, or switch WSL to mirrored networking (`networkingMode=mirrored` in `.wslconfig`).
+
+**Command syntax errors**
+
+Command syntax changes between Minecraft versions. For example, in 26.x `time query daytime` no longer exists and you use `time query day`. Let the AI read the error and retry, or ask it to check the command with `run_command` first.
 
 ## Development
 
