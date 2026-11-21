@@ -11,7 +11,9 @@ import { loadSettings, policyOf, STATE_DIR } from "./config.ts";
 import { History } from "./history.ts";
 import { formatSummary, summarizeRegion } from "./inspect.ts";
 import { listOps, logOps, mutate, runPlain, undoOps, type Result } from "./ops.ts";
-import { describePalette, paletteCmds, paletteFill, toPalette, type BlockInput } from "./palette.ts";
+import { MARK, describePalette, paletteCmds, paletteFill, toPalette, type BlockInput } from "./palette.ts";
+import { planCommands } from "./plan.ts";
+import * as S from "./shapes.ts";
 import { OpLog } from "./oplog.ts";
 import { join } from "node:path";
 import { hi, lo } from "./builders.ts";
@@ -68,7 +70,7 @@ const build = (c: Ctx, tool: string, desc: string, cmds: string[], dryRun: boole
 /** block が文字列ならそのまま、配列ならパレットで混ぜたコマンドにする */
 function withBlock(input: BlockInput, seed: number | undefined, plain: (b: string) => string[]) {
   const pal = toPalette(input);
-  return pal ? { cmds: paletteCmds(plain("stone"), pal, seed ?? 1), label: describePalette(pal) } : { cmds: plain(input as string), label: input as string };
+  return pal ? { cmds: paletteCmds(plain(MARK), pal, seed ?? 1, MARK), label: describePalette(pal) } : { cmds: plain(input as string), label: input as string };
 }
 
 function guard(volume: number): Result | null {
@@ -174,6 +176,70 @@ server.registerTool("build_line", {
   const r = withBlock(block, seed, (b) => B.lineCmds(from, to, b));
   return build(c, "build_line", `${from.join(",")} → ${to.join(",")} ${r.label}`, r.cmds, dryRun);
 }));
+
+const shapeTool = (c: Ctx, tool: string, desc: string, input: BlockInput, seed: number | undefined, dryRun: boolean, plain: (b: string) => string[]) => {
+  const r = withBlock(input, seed, plain);
+  return guard(planCommands(r.cmds).blocks) ?? build(c, tool, `${desc} ${r.label}`, r.cmds, dryRun);
+};
+
+server.registerTool("build_pyramid", {
+  description: "四角錐を作る。center は底面の中心、radius は底面の半幅（一辺は 2*radius+1）。hollow=true で中を空ける。block を配列にすると割合で混ぜる。undo で戻せる。",
+  inputSchema: { center: vec, radius: z.number().int().min(1).max(60), block, hollow: z.boolean().default(false), seed: seedArg, dryRun: dryRunArg, server: serverArg },
+}, on(async (c, { center, radius, block, hollow, seed, dryRun }: any) =>
+  shapeTool(c, "build_pyramid", `中心 ${center.join(",")} 半径 ${radius}`, block, seed, dryRun, (b) => S.pyramidCmds(center, radius, b, hollow))));
+
+server.registerTool("build_arch", {
+  description: "半円のアーチを作る。start は一方の脚の最小角の座標。axis=x なら x 方向に width ブロック幅で開き、depth は奥行き（z 方向）。axis=z ならその逆。" +
+    "legHeight は脚の高さ、wall は厚み。門・橋の下・回廊に使う。undo で戻せる。",
+  inputSchema: {
+    start: vec, axis: z.enum(["x", "z"]), width: z.number().int().min(3).max(100), legHeight: z.number().int().min(0).max(100).default(3),
+    wall: z.number().int().min(1).max(6).default(1), depth: z.number().int().min(1).max(50).default(1),
+    block, seed: seedArg, dryRun: dryRunArg, server: serverArg,
+  },
+}, on(async (c, { start, axis, width, legHeight, wall, depth, block, seed, dryRun }: any) =>
+  shapeTool(c, "build_arch", `始点 ${start.join(",")} ${axis} 幅 ${width}`, block, seed, dryRun, (b) => S.archCmds(start, axis, width, legHeight, wall, depth, b))));
+
+server.registerTool("build_spiral_stairs", {
+  description: "らせん階段を作る。center は中心、radius は外周の半径、height は段数（1段ごとに 1 ブロック上がるので、歩くにはジャンプが要る）。" +
+    "pillar を指定すると中心に柱を立てる。階段ブロックの向きは扱わない。undo で戻せる。",
+  inputSchema: {
+    center: vec, radius: z.number().int().min(1).max(30), height: z.number().int().min(1).max(320), block,
+    pillar: z.string().optional().describe("中心の柱のブロック。省くと柱なし"),
+    clockwise: z.boolean().default(true), seed: seedArg, dryRun: dryRunArg, server: serverArg,
+  },
+}, on(async (c, { center, radius, height, block, pillar, clockwise, seed, dryRun }: any) =>
+  shapeTool(c, "build_spiral_stairs", `中心 ${center.join(",")} 半径 ${radius} ${height} 段`, block, seed, dryRun, (b) => S.spiralStairsCmds(center, radius, height, b, pillar ?? null, clockwise))));
+
+server.registerTool("build_roof", {
+  description: "屋根を作る。from/to は屋根の土台（一番下の層）の対角で、y は土台の高さ。" +
+    "style=gable は長い辺に沿った切妻、hip は四方が傾く寄棟。stairBlock（例: oak_stairs）を指定すると、切妻の傾斜面を向きつきの階段で作り、棟と寄棟は block で作る。" +
+    "solid=true で中も埋める。undo で戻せる。",
+  inputSchema: {
+    from: vec, to: vec, style: z.enum(["gable", "hip"]).default("gable"), block,
+    stairBlock: z.string().optional(), solid: z.boolean().default(false), seed: seedArg, dryRun: dryRunArg, server: serverArg,
+  },
+}, on(async (c, { from, to, style, block, stairBlock, solid, seed, dryRun }: any) =>
+  shapeTool(c, "build_roof", `${from.join(",")} → ${to.join(",")} ${style}`, block, seed, dryRun, (b) => S.roofCmds(from, to, style, b, stairBlock ?? null, solid))));
+
+server.registerTool("build_walls", {
+  description: "四方の壁（床と天井は作らない）に、等間隔の窓と出入口の開口をまとめて作る。from/to は外壁の対角で、from の y が床の高さ。" +
+    "window 系で窓の大きさ・高さ・間隔を決める。door を渡すと、その壁に開口（空気）を開ける（ドアのブロックは置かない）。undo で戻せる。",
+  inputSchema: {
+    from: vec, to: vec, height: z.number().int().min(2).max(100), block,
+    windowBlock: z.string().default("glass"), windowWidth: z.number().int().min(1).max(10).default(2),
+    windowHeight: z.number().int().min(1).max(10).default(2),
+    sill: z.number().int().min(1).max(50).default(2).describe("床から窓の下端までの高さ"),
+    spacing: z.number().int().min(1).max(10).default(2).describe("窓と窓の間隔"),
+    door: z.object({
+      side: z.enum(["north", "south", "east", "west"]).describe("north は z が小さい側"),
+      width: z.number().int().min(1).max(5).default(1), height: z.number().int().min(1).max(6).default(2),
+      offset: z.number().int().min(0).optional().describe("その壁の端から開口の中心までのブロック数。省くと中央"),
+    }).optional(),
+    seed: seedArg, dryRun: dryRunArg, server: serverArg,
+  },
+}, on(async (c, { from, to, height, block, windowBlock, windowWidth, windowHeight, sill, spacing, door, seed, dryRun }: any) =>
+  shapeTool(c, "build_walls", `${from.join(",")} → ${to.join(",")} 高さ ${height}`, block, seed, dryRun,
+    (b) => S.wallsCmds(from, to, b, { height, windowBlock, windowWidth, windowHeight, sill, spacing, door }))));
 
 server.registerTool("run_commands", {
   description: "複数コマンドをまとめて実行する（最大 2000 件）。細かい装飾や家具の配置に使う。" +
