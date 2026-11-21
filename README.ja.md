@@ -11,14 +11,14 @@
 <p align="center">Claude や Codex などの AI から、Minecraft Java 版のサーバーで建築やゲーム内の操作ができる MCP サーバーです。RCON でつなぐので、Mod は要りません。</p>
 
 <p align="center">
-  <a href="https://github.com/Lapius7/mcp-minecraft-controller/releases"><img alt="Release" src="https://img.shields.io/github/v/release/Lapius7/mcp-minecraft-controller?label=release&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
-  <a href="https://github.com/Lapius7/mcp-minecraft-controller/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/Lapius7/mcp-minecraft-controller/ci.yml?branch=main&label=CI&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/Lapius7/mcp-minecraft-controller?style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
-  <a href="https://bun.sh"><img alt="Bun" src="https://img.shields.io/badge/runtime-Bun-6e8fb3?logo=bun&logoColor=white&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
-  <a href="https://modelcontextprotocol.io"><img alt="MCP" src="https://img.shields.io/badge/protocol-MCP-6e8fb3?style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
-  <a href="https://www.minecraft.net"><img alt="Minecraft Java" src="https://img.shields.io/badge/Minecraft-Java%20Edition-6e8fb3?style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
-  <a href="https://github.com/Lapius7/mcp-minecraft-controller/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Lapius7/mcp-minecraft-controller?label=stars&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
-  <a href="https://github.com/Lapius7/mcp-minecraft-controller/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/Lapius7/mcp-minecraft-controller?label=last%20commit&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://github.com/Lapius7/mcp-minecraft-controller/releases"><img alt="Release" src="https://img.shields.io/github/v/release/Lapius7/mcp-minecraft-controller?label=release&style=flat-square&color=e8833a&logo=github"></a>
+  <a href="https://github.com/Lapius7/mcp-minecraft-controller/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/Lapius7/mcp-minecraft-controller/ci.yml?branch=main&label=CI&style=flat-square&logo=githubactions&logoColor=white"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/Lapius7/mcp-minecraft-controller?style=flat-square&color=97ca00"></a>
+  <a href="https://bun.sh"><img alt="Bun" src="https://img.shields.io/badge/runtime-Bun-fbf0df?logo=bun&logoColor=000000&style=flat-square&labelColor=000000"></a>
+  <a href="https://modelcontextprotocol.io"><img alt="MCP" src="https://img.shields.io/badge/protocol-MCP-7c3aed?logo=modelcontextprotocol&logoColor=white&style=flat-square"></a>
+  <a href="https://www.minecraft.net"><img alt="Minecraft Java" src="https://img.shields.io/badge/Minecraft-Java%20Edition-62b47a?style=flat-square"></a>
+  <a href="https://github.com/Lapius7/mcp-minecraft-controller/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Lapius7/mcp-minecraft-controller?label=stars&style=flat-square&color=e3b341&logo=github"></a>
+  <a href="https://github.com/Lapius7/mcp-minecraft-controller/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/Lapius7/mcp-minecraft-controller?label=last%20commit&style=flat-square&color=2f81f7"></a>
 </p>
 
 <p align="center"><a href="#最短セットアップ">最短セットアップ</a> · <a href="#ツール">ツール</a> · <a href="#安全のために">安全のために</a> · <a href="#今後の予定">今後の予定</a></p>
