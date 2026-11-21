@@ -14,6 +14,7 @@ import { listOps, logOps, mutate, runPlain, undoOps, type Result } from "./ops.t
 import { MARK, describePalette, paletteCmds, paletteFill, toPalette, type BlockInput } from "./palette.ts";
 import { planCommands } from "./plan.ts";
 import * as S from "./shapes.ts";
+import { copyCmds, resultSize } from "./copy.ts";
 import { OpLog } from "./oplog.ts";
 import { join } from "node:path";
 import { hi, lo } from "./builders.ts";
@@ -240,6 +241,27 @@ server.registerTool("build_walls", {
 }, on(async (c, { from, to, height, block, windowBlock, windowWidth, windowHeight, sill, spacing, door, seed, dryRun }: any) =>
   shapeTool(c, "build_walls", `${from.join(",")} → ${to.join(",")} 高さ ${height}`, block, seed, dryRun,
     (b) => S.wallsCmds(from, to, b, { height, windowBlock, windowWidth, windowHeight, sill, spacing, door }))));
+
+server.registerTool("copy_region", {
+  description: "範囲をコピーして別の場所に貼り付ける（サーバー側の clone）。回転（90 度刻み）と x / z 方向の反転ができる。" +
+    "dest は貼り付け後の箱の最小の角（x・y・z がいちばん小さい角）。コピー元と貼り付け先が重なってはいけない。" +
+    "回転・反転は 1×高さ×1 の柱ごとに行うので、階段などの向き（facing）は回転しない。チェストなどの中身は引き継ぐ。コピー元のチャンクが読み込まれている必要がある。undo で戻せる。",
+  inputSchema: {
+    from: vec, to: vec, dest: vec,
+    rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0).describe("上から見て時計回りの角度"),
+    flipX: z.boolean().default(false), flipZ: z.boolean().default(false),
+    skipAir: z.boolean().default(false).describe("true なら空気を貼り付けず、貼り付け先を残す"),
+    dryRun: dryRunArg, server: serverArg,
+  },
+}, on(async (c, { from, to, dest, rotate, flipX, flipZ, skipAir, dryRun }: any) => {
+  const g = guard(B.volume(from, to));
+  if (g) return g;
+  let cmds: string[];
+  try { cmds = copyCmds(from, to, dest, { rotate, flipX, flipZ, skipAir }); }
+  catch (e) { return { text: e instanceof Error ? e.message : String(e), isError: true }; }
+  const sz = resultSize(from, to, rotate);
+  return build(c, "copy_region", `${from.join(",")} → ${to.join(",")} を ${dest.join(",")} へ（${sz.join("×")}、回転 ${rotate}${flipX ? " x反転" : ""}${flipZ ? " z反転" : ""}）`, cmds, dryRun);
+}));
 
 server.registerTool("run_commands", {
   description: "複数コマンドをまとめて実行する（最大 2000 件）。細かい装飾や家具の配置に使う。" +

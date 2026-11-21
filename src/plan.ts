@@ -17,7 +17,7 @@ const vecAt = (t: string[], i: number, cmd: string): Vec => {
   return v.map(Number) as Vec;
 };
 
-/** fill / setblock だけを受け付ける。ほかは範囲が分からないので例外 */
+/** fill / setblock / clone だけを受け付ける。ほかは範囲が分からないので例外 */
 export function planCommands(cmds: string[]): Plan {
   const boxes: Box[] = [];
   for (const c of cmds) {
@@ -28,6 +28,11 @@ export function planCommands(cmds: string[]): Plan {
     } else if (t[0] === "setblock") {
       const a = vecAt(t, 1, c);
       boxes.push({ lo: a, hi: a });
+    } else if (t[0] === "clone") {
+      // 書き込み先の箱（コピー元と同じ大きさ）が書き換わる範囲
+      const a = vecAt(t, 1, c), b = vecAt(t, 4, c), d = vecAt(t, 7, c);
+      const l = lo(a, b), h = hi(a, b);
+      boxes.push({ lo: d, hi: [d[0] + h[0] - l[0], d[1] + h[1] - l[1], d[2] + h[2] - l[2]] });
     } else throw new Error(`範囲を調べられないコマンドです: ${c}`);
   }
   if (boxes.length === 0) throw new Error("コマンドがありません");
