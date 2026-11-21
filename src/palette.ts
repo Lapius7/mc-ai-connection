@@ -46,12 +46,16 @@ const picker = (p: Palette, rand: () => number) => {
  * mode なしの fill と setblock のブロック名を、パレットから1ブロックずつ選び直す。
  * Z 方向に同じブロックが続く所は、1つの fill にまとめる
  */
-export function paletteCmds(cmds: string[], palette: Palette, seed = 1): string[] {
+export const MARK = "__pal__";
+
+export function paletteCmds(cmds: string[], palette: Palette, seed = 1, marker?: string): string[] {
   const pick = picker(palette, rng(seed));
   const out: string[] = [];
   let cells = 0;
   for (const c of cmds) {
     const t = c.trim().split(/\s+/);
+    // marker があるときは、そのブロック名のコマンドだけ混ぜる（ほかはそのまま通す）
+    if (marker && t[t.length - 1] !== marker) { out.push(c); continue; }
     let a: Vec, b: Vec;
     if (t[0] === "setblock" && t.length === 5) {
       a = b = [Number(t[1]), Number(t[2]), Number(t[3])];

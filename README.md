@@ -115,6 +115,11 @@ The lists apply to every command the MCP sends, including the ones that `fill` a
 | `build_sphere` | Build a sphere (radius 1 to 60), optionally hollow |
 | `build_cylinder` | Build a cylinder (radius 1 to 60, height 1 to 320), optionally hollow |
 | `build_line` | Draw a 3D line between two points |
+| `build_pyramid` | Square pyramid (optionally hollow) |
+| `build_arch` | Semicircular arch with legs, thickness and depth |
+| `build_spiral_stairs` | Spiral stairs around an optional center pillar (one block up per step) |
+| `build_roof` | Gable or hip roof; `stairBlock` makes the gable slopes from facing stairs |
+| `build_walls` | Four walls with evenly spaced windows and a door opening (air; no door block) |
 | `undo` | Undo the latest writes (`steps` = how many). Newest first only |
 | `list_history` | List the writes `undo` can restore, per server |
 | `operation_log` | Show the latest log entries (runs, dry runs, refusals, failures, undos) |
@@ -192,6 +197,7 @@ pnpm start   # start the MCP server on stdio
 | `src/history.ts` | Backup before writing, and undo |
 | `src/ops.ts` | Shared flow for writes: policy, dry run, backup, run |
 | `src/palette.ts` | Mix blocks by ratio |
+| `src/shapes.ts` | Pyramid, arch, spiral stairs, roof, walls with windows |
 | `src/oplog.ts` | Operation log file |
 | `src/inspect.ts` | Block counts for a region |
 | `src/config.ts` | Settings file |
@@ -199,7 +205,6 @@ pnpm start   # start the MCP server on stdio
 
 ## Roadmap
 
-- More shapes: pyramid, arch, spiral stairs, roof, walls with windows
 - Paste a schematic (`.schem` / `.nbt`) at a position
 - Copy and paste a region, with rotation and flipping
 - Check block names per Minecraft version before running
