@@ -1,19 +1,34 @@
-# mcp-minecraft-controller
+<div align="center">
 
-[![Release](https://img.shields.io/github/v/release/Lapius7/mcp-minecraft-controller)](https://github.com/Lapius7/mcp-minecraft-controller/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/Lapius7/mcp-minecraft-controller/ci.yml?branch=main&label=CI)](https://github.com/Lapius7/mcp-minecraft-controller/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/github/license/Lapius7/mcp-minecraft-controller)](LICENSE)
-[![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun&logoColor=black)](https://bun.sh)
-[![MCP](https://img.shields.io/badge/protocol-MCP-6b46c1)](https://modelcontextprotocol.io)
-[![Minecraft Java](https://img.shields.io/badge/Minecraft-Java%20Edition-62b47a)](https://www.minecraft.net)
+<p align="center"><b>English</b> | <a href="README.ja.md">日本語</a></p>
 
-[日本語](README.ja.md)
+<p align="center">
+  <img src="docs/images/banner.png" alt="MCP Minecraft Controller" width="100%">
+</p>
 
-An MCP server that lets AI assistants (Claude, Codex, and any other MCP client) build and operate on a Minecraft Java server over RCON. No mod is required.
+<h3 align="center">Let your AI build in Minecraft, over RCON, with no mod.</h3>
 
-![A stone-brick cathedral built from Minecraft blocks, with the unfinished roof left as an amber wireframe](docs/images/hero.png)
+<p align="center">An MCP server that lets AI assistants (Claude, Codex, and any other MCP client) build and operate on a Minecraft Java server over RCON. No mod is required.</p>
+
+<p align="center">
+  <a href="https://github.com/Lapius7/mcp-minecraft-controller/releases"><img alt="Release" src="https://img.shields.io/github/v/release/Lapius7/mcp-minecraft-controller?label=release&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://github.com/Lapius7/mcp-minecraft-controller/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/Lapius7/mcp-minecraft-controller/ci.yml?branch=main&label=CI&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/Lapius7/mcp-minecraft-controller?style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://bun.sh"><img alt="Bun" src="https://img.shields.io/badge/runtime-Bun-6e8fb3?logo=bun&logoColor=white&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://modelcontextprotocol.io"><img alt="MCP" src="https://img.shields.io/badge/protocol-MCP-6e8fb3?style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://www.minecraft.net"><img alt="Minecraft Java" src="https://img.shields.io/badge/Minecraft-Java%20Edition-6e8fb3?style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://github.com/Lapius7/mcp-minecraft-controller/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Lapius7/mcp-minecraft-controller?label=stars&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://github.com/Lapius7/mcp-minecraft-controller/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/Lapius7/mcp-minecraft-controller?label=last%20commit&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+</p>
+
+<p align="center"><a href="#quick-start">Quick start</a> · <a href="#tools">Tools</a> · <a href="#safety">Safety</a> · <a href="#roadmap">Roadmap</a></p>
+
+</div>
+
+---
 
 Ask for "a stone-brick tower next to Steve" or "a glass dome of radius 10 at the origin", and the AI turns it into server commands.
+
 
 ## Highlights
 
@@ -76,6 +91,9 @@ Any other MCP client works if it can launch `bun run src/index.ts` over stdio.
 
 ## Tools
 
+<details>
+<summary>All tools</summary>
+
 | Tool | Description |
 |---|---|
 | `list_servers` | List the registered servers and the current default |
@@ -100,6 +118,8 @@ Any other MCP client works if it can launch `bun run src/index.ts` over stdio.
 | `operation_log` | Show the latest log entries (runs, dry runs, refusals, failures, undos) |
 | `inspect_region` | Count blocks by type in a region (read only) |
 
+</details>
+
 `set_block`, `fill`, and `build_*` take `dryRun: true`, which runs nothing and returns the command count, the most blocks that could change, and the bounding box.
 
 > [!TIP]
@@ -115,22 +135,12 @@ Coordinates are absolute integers in the form `[x, y, z]`. Blocks accept block s
 2. It picks shapes (`fill`, `build_sphere`, ...) and, for fine detail, sends many commands through `run_commands`.
 3. It checks results with commands such as `execute if block x y z <block>`, which return "Test passed" or "Test failed".
 
-## Safety
-
-> [!WARNING]
-> RCON is unencrypted and has full control of the server. Never expose the RCON port to the internet. Use a strong password and a firewall.
-
-> [!IMPORTANT]
-> `stop`, `op`, `ban`, and similar commands are refused by default (see the settings file). Only connect to servers you own, and tighten `commands.allow` if the AI should do less.
-
-> [!NOTE]
-> `undo` covers `set_block`, `fill`, and `build_*` only. Back up the world before large builds, and before anything done through `run_command`. `MC_MAX_VOLUME` refuses oversized single operations.
-
-Only server-side commands are available. Client-side actions such as camera, movement, and screenshots are out of scope.
-
 ## Multiple servers
 
 Register several servers in `~/.config/mc-ai-connection/servers.json` (override the path with `MC_SERVERS_FILE`). See [`servers.example.json`](servers.example.json). Keep the file private (`chmod 600`).
+
+<details>
+<summary>Server fields</summary>
 
 | Field | Description |
 |---|---|
@@ -141,9 +151,14 @@ Register several servers in `~/.config/mc-ai-connection/servers.json` (override 
 | `description` | Free text shown by `list_servers` |
 | `default` (top level) | The server used when a call has no `server` |
 
+</details>
+
 Every tool takes an optional `server` argument. `list_servers` shows what is registered, and `use_server` changes the default until the MCP restarts. Without the file, the `MC_RCON_*` variables below define a single server named `default`, as before. With the file, they are ignored.
 
-## Configuration
+## Environment variables
+
+<details>
+<summary>Environment variables</summary>
 
 | Variable | Default | Description |
 |---|---|---|
@@ -154,12 +169,17 @@ Every tool takes an optional `server` argument. `list_servers` shows what is reg
 | `MC_MAX_PALETTE_BLOCKS` | `30000` | Maximum number of blocks one operation may mix with a palette |
 | `MC_MAX_COPY_COLUMNS` | `10000` | Maximum number of columns that `copy_region` may rotate or flip in one call |
 
+</details>
+
 ## Settings file
 
 Behavior settings live in `~/.config/mc-ai-connection/config.json` (override the path with `MC_CONFIG_FILE`). See [`config.example.json`](config.example.json). Every field is optional.
 
 > [!NOTE]
 > The directory is still named `mc-ai-connection`, after the project's old name. It is kept so that existing settings keep working.
+
+<details>
+<summary>Settings fields</summary>
 
 | Field | Default | Description |
 |---|---|---|
@@ -171,6 +191,8 @@ Behavior settings live in `~/.config/mc-ai-connection/config.json` (override the
 | `undo.limit` | `20` | History entries kept per server. Older ones are dropped |
 | `undo.origin` | `[29000000, 29000000]` | `[x, z]` of the backup area (see Undo). Keep it inside the world border |
 | `undo.maxVolume` | `2000000` | Largest number of blocks one operation may back up |
+
+</details>
 
 The lists apply to the commands you or the AI ask for: `run_command`, `run_commands`, and the ones that `fill` and `build_*` generate, including the command after `run` in `execute ... run <command>`. The MCP's own internal commands (the `clone` and `forceload` that undo and `inspect_region` use, and the `data get` behind `get_player_pos`) are not checked, so a deny rule on `clone` does not break undo. The history lives in `MC_STATE_DIR` (default `~/.local/state/mc-ai-connection`).
 
@@ -223,6 +245,19 @@ Before `set_block`, `fill`, and `build_*` write, the MCP copies the region to a 
 
 Command syntax changes between Minecraft versions. For example, in 26.x `time query daytime` no longer exists and you use `time query day`. Let the AI read the error and retry, or ask it to check the command with `run_command` first.
 
+## Safety
+
+> [!WARNING]
+> RCON is unencrypted and has full control of the server. Never expose the RCON port to the internet. Use a strong password and a firewall.
+
+> [!IMPORTANT]
+> `stop`, `op`, `ban`, and similar commands are refused by default (see the settings file). Only connect to servers you own, and tighten `commands.allow` if the AI should do less.
+
+> [!NOTE]
+> `undo` covers `set_block`, `fill`, and `build_*` only. Back up the world before large builds, and before anything done through `run_command`. `MC_MAX_VOLUME` refuses oversized single operations.
+
+Only server-side commands are available. Client-side actions such as camera, movement, and screenshots are out of scope.
+
 ## Development
 
 ```sh
@@ -230,6 +265,9 @@ pnpm check   # type check and unit tests (no server needed)
 pnpm test    # unit tests only
 pnpm start   # start the MCP server on stdio
 ```
+
+<details>
+<summary>Source files</summary>
 
 | File | Role |
 |---|---|
@@ -249,6 +287,8 @@ pnpm start   # start the MCP server on stdio
 | `src/inspect.ts` | Block counts for a region |
 | `src/config.ts` | Settings file |
 | `src/index.ts` | MCP tool definitions |
+
+</details>
 
 ## Roadmap
 

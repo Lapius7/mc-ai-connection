@@ -1,19 +1,34 @@
-# mcp-minecraft-controller
+<div align="center">
 
-[![Release](https://img.shields.io/github/v/release/Lapius7/mcp-minecraft-controller)](https://github.com/Lapius7/mcp-minecraft-controller/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/Lapius7/mcp-minecraft-controller/ci.yml?branch=main&label=CI)](https://github.com/Lapius7/mcp-minecraft-controller/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/github/license/Lapius7/mcp-minecraft-controller)](LICENSE)
-[![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun&logoColor=black)](https://bun.sh)
-[![MCP](https://img.shields.io/badge/protocol-MCP-6b46c1)](https://modelcontextprotocol.io)
-[![Minecraft Java](https://img.shields.io/badge/Minecraft-Java%20Edition-62b47a)](https://www.minecraft.net)
+<p align="center"><a href="README.md">English</a> | <b>日本語</b></p>
 
-[English](README.md)
+<p align="center">
+  <img src="docs/images/banner.png" alt="MCP Minecraft Controller" width="100%">
+</p>
 
-Claude や Codex などの AI から、Minecraft Java 版のサーバーで建築やゲーム内の操作ができる MCP サーバーです。RCON でつなぐので、Mod は要りません。
+<h3 align="center">AI に Minecraft の建築を任せられます。Mod は要らず、RCON でつなぎます。</h3>
 
-![ブロックで建てた石レンガの大聖堂。未完成の屋根は琥珀色のワイヤーフレームで残してある](docs/images/hero.png)
+<p align="center">Claude や Codex などの AI から、Minecraft Java 版のサーバーで建築やゲーム内の操作ができる MCP サーバーです。RCON でつなぐので、Mod は要りません。</p>
+
+<p align="center">
+  <a href="https://github.com/Lapius7/mcp-minecraft-controller/releases"><img alt="Release" src="https://img.shields.io/github/v/release/Lapius7/mcp-minecraft-controller?label=release&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://github.com/Lapius7/mcp-minecraft-controller/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/Lapius7/mcp-minecraft-controller/ci.yml?branch=main&label=CI&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/Lapius7/mcp-minecraft-controller?style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://bun.sh"><img alt="Bun" src="https://img.shields.io/badge/runtime-Bun-6e8fb3?logo=bun&logoColor=white&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://modelcontextprotocol.io"><img alt="MCP" src="https://img.shields.io/badge/protocol-MCP-6e8fb3?style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://www.minecraft.net"><img alt="Minecraft Java" src="https://img.shields.io/badge/Minecraft-Java%20Edition-6e8fb3?style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://github.com/Lapius7/mcp-minecraft-controller/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Lapius7/mcp-minecraft-controller?label=stars&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+  <a href="https://github.com/Lapius7/mcp-minecraft-controller/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/Lapius7/mcp-minecraft-controller?label=last%20commit&style=flat-square&labelColor=2b3138&color=6e8fb3"></a>
+</p>
+
+<p align="center"><a href="#最短セットアップ">最短セットアップ</a> · <a href="#ツール">ツール</a> · <a href="#安全のために">安全のために</a> · <a href="#今後の予定">今後の予定</a></p>
+
+</div>
+
+---
 
 「Steve の隣に石レンガの塔を建てて」「原点に半径 10 のガラスのドームをかぶせて」と頼むと、AI がサーバーのコマンドに変えて実行します。
+
 
 ## 特長
 
@@ -76,6 +91,9 @@ env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 
 ## ツール
 
+<details>
+<summary>ツール一覧</summary>
+
 | ツール | 内容 |
 |---|---|
 | `list_servers` | 登録済みのサーバーと、現在の既定を一覧する |
@@ -100,6 +118,8 @@ env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 | `operation_log` | 直近の操作ログを返す(実行、ドライラン、拒否、失敗、undo) |
 | `inspect_region` | 範囲内のブロックを種類ごとに数える(読み取りのみ) |
 
+</details>
+
 `set_block` `fill` `build_*` には `dryRun: true` を渡せます。何も実行せず、コマンド数、変わりうる最大のブロック数、範囲だけを返します。
 
 > [!TIP]
@@ -115,22 +135,12 @@ env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 2. `fill` や `build_sphere` などで形を作り、細部は `run_commands` で大量のコマンドを送ります。
 3. `execute if block x y z <ブロック>` で結果を確かめます。「Test passed」か「Test failed」が返ります。
 
-## 安全のために
-
-> [!WARNING]
-> RCON は暗号化されず、サーバーを完全に操作できます。RCON のポートをインターネットに公開しないでください。長いパスワードとファイアウォールを使ってください。
-
-> [!IMPORTANT]
-> `stop` `op` `ban` などのコマンドは、既定で拒否します(設定ファイルを参照)。自分のサーバーにだけつないでください。AI にさせたくないことが多いなら、`commands.allow` で絞ります。
-
-> [!NOTE]
-> `undo` で戻せるのは `set_block` `fill` `build_*` だけです。大きな建築の前と、`run_command` で行う操作の前には、ワールドのバックアップを取ってください。上限を超える1回の操作は `MC_MAX_VOLUME` で断ります。
-
-使えるのはサーバー側のコマンドだけです。視点、移動、スクリーンショットなどのクライアント側の操作はできません。
-
 ## 複数のサーバー
 
 `~/.config/mc-ai-connection/servers.json` に複数のサーバーを登録できます(場所は `MC_SERVERS_FILE` で変えられます)。書き方は [`servers.example.json`](servers.example.json) を見てください。パスワードが入るので、ファイルは自分だけが読めるようにします(`chmod 600`)。
+
+<details>
+<summary>サーバーの項目</summary>
 
 | 項目 | 内容 |
 |---|---|
@@ -141,9 +151,14 @@ env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 | `description` | `list_servers` に出る説明 |
 | `default`(最上位) | 呼び出しに `server` がないときに使うサーバー |
 
+</details>
+
 どのツールにも、任意の `server` 引数があります。`list_servers` で登録済みのサーバーを確認でき、`use_server` で既定のサーバーを切り替えられます(MCP を再起動するまで有効)。設定ファイルがなければ、これまでどおり次の `MC_RCON_*` で `default` という1台だけを登録した扱いになります。設定ファイルがあるときは、`MC_RCON_*` は使われません。
 
 ## 環境変数
+
+<details>
+<summary>環境変数の一覧</summary>
 
 | 名前 | 既定値 | 内容 |
 |---|---|---|
@@ -154,12 +169,17 @@ env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 | `MC_MAX_COPY_COLUMNS` | `10000` | `copy_region` で1回に回転・反転できる柱の数の上限 |
 | `MC_MAX_VOLUME` | `200000` | 1回の操作で変えてよいブロック数の上限 |
 
+</details>
+
 ## 設定ファイル
 
 動作の設定は `~/.config/mc-ai-connection/config.json` に書きます(場所は `MC_CONFIG_FILE` で変えられます)。書き方は [`config.example.json`](config.example.json) を見てください。項目はすべて省略できます。
 
 > [!NOTE]
 > ディレクトリ名は、プロジェクトの旧名のまま `mc-ai-connection` です。既存の設定を壊さないために変えていません。
+
+<details>
+<summary>設定項目の一覧</summary>
 
 | 項目 | 既定値 | 内容 |
 |---|---|---|
@@ -171,6 +191,8 @@ env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 | `undo.limit` | `20` | サーバーごとに残す履歴の件数。超えた古いものは捨てます |
 | `undo.origin` | `[29000000, 29000000]` | バックアップ置き場の `[x, z]`(「元に戻す」を参照)。ワールドボーダーの内側にしてください |
 | `undo.maxVolume` | `2000000` | 1回の操作でバックアップできる最大のブロック数 |
+
+</details>
 
 リストが効くのは、利用者や AI が頼んだコマンドです。`run_command`、`run_commands`、`fill` や `build_*` が作るコマンドが対象で、`execute ... run <コマンド>` の `run` 以降も含みます。MCP が内部で使うコマンド(undo と `inspect_region` の `clone` と `forceload`、`get_player_pos` の `data get`)は検査しません。そのため `clone` を禁止しても undo は壊れません。履歴は `MC_STATE_DIR`(既定は `~/.local/state/mc-ai-connection`)に保存します。
 
@@ -223,6 +245,19 @@ env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 
 コマンドの文法は Minecraft のバージョンで変わります。たとえば 26.x では `time query daytime` が使えず、`time query day` になっています。エラーを AI に読ませて再試行させるか、先に `run_command` で確認するよう頼んでください。
 
+## 安全のために
+
+> [!WARNING]
+> RCON は暗号化されず、サーバーを完全に操作できます。RCON のポートをインターネットに公開しないでください。長いパスワードとファイアウォールを使ってください。
+
+> [!IMPORTANT]
+> `stop` `op` `ban` などのコマンドは、既定で拒否します(設定ファイルを参照)。自分のサーバーにだけつないでください。AI にさせたくないことが多いなら、`commands.allow` で絞ります。
+
+> [!NOTE]
+> `undo` で戻せるのは `set_block` `fill` `build_*` だけです。大きな建築の前と、`run_command` で行う操作の前には、ワールドのバックアップを取ってください。上限を超える1回の操作は `MC_MAX_VOLUME` で断ります。
+
+使えるのはサーバー側のコマンドだけです。視点、移動、スクリーンショットなどのクライアント側の操作はできません。
+
 ## 開発
 
 ```sh
@@ -230,6 +265,9 @@ pnpm check   # 型チェックと単体テスト(サーバーは不要)
 pnpm test    # 単体テストだけ
 pnpm start   # MCP サーバーを起動(標準入出力で待ち受ける)
 ```
+
+<details>
+<summary>ソースファイルの一覧</summary>
 
 | ファイル | 役割 |
 |---|---|
@@ -249,6 +287,8 @@ pnpm start   # MCP サーバーを起動(標準入出力で待ち受ける)
 | `src/inspect.ts` | 範囲内のブロックの集計 |
 | `src/config.ts` | 設定ファイル |
 | `src/index.ts` | MCP のツール定義 |
+
+</details>
 
 ## 今後の予定
 
