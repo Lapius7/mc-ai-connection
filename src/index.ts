@@ -10,7 +10,9 @@ import { denied } from "./policy.ts";
 import { loadSettings, policyOf, STATE_DIR } from "./config.ts";
 import { History } from "./history.ts";
 import { formatSummary, summarizeRegion } from "./inspect.ts";
-import { listOps, mutate, runPlain, undoOps, type Result } from "./ops.ts";
+import { listOps, logOps, mutate, runPlain, undoOps, type Result } from "./ops.ts";
+import { OpLog } from "./oplog.ts";
+import { join } from "node:path";
 import { hi, lo } from "./builders.ts";
 
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
@@ -19,6 +21,7 @@ const toMcp = (r: Result) => (r.isError ? fail(r.text) : text(r.text));
 
 const settings = loadSettings();
 const policy = policyOf(settings);
+const oplog = new OpLog(settings.log.enabled ? settings.log.file ?? join(STATE_DIR, "operations.jsonl") : null);
 const histories = new Map<string, History>();
 const historyFor = (name: string) => {
   let h = histories.get(name);
@@ -40,6 +43,7 @@ const block = z.string().describe("例: stone, oak_planks, minecraft:glass, oak_
 const server = new McpServer({ name: "mc-ai-connection", version: "0.2.0" });
 
 type Ctx = { rcon: Rcon; name: string; history: History };
+const logTo = (c: Ctx, tool: string) => ({ log: oplog, server: c.name, tool });
 
 /** 各ツールの共通処理。サーバーを解決し、接続や設定の失敗は isError で返す */
 const on = <A extends { server?: string }>(fn: (c: Ctx, a: A) => Promise<Result>) =>
@@ -53,7 +57,7 @@ const on = <A extends { server?: string }>(fn: (c: Ctx, a: A) => Promise<Result>
   };
 
 const build = (c: Ctx, tool: string, desc: string, cmds: string[], dryRun: boolean) =>
-  mutate({ rcon: c.rcon, policy, settings, history: c.history }, tool, desc, cmds, dryRun);
+  mutate({ rcon: c.rcon, policy, settings, history: c.history, log: oplog, server: c.name }, tool, desc, cmds, dryRun);
 
 function guard(volume: number): Result | null {
   return volume > B.MAX_VOLUME
@@ -84,10 +88,15 @@ server.registerTool("run_command", {
   description: "Minecraft のコマンドを1つ実行する（先頭の / は不要）。結果の文字列を返す。" +
     "禁止リスト（既定で stop / op / ban など）にあるコマンドは拒否される。このツールの操作は undo で戻せない。",
   inputSchema: { command: z.string(), server: serverArg },
-}, on(async ({ rcon }, { command }: { command: string; server?: string }) => {
+}, on(async (c, { command }: { command: string; server?: string }) => {
   const d = denied(policy, [command]);
-  if (d.length) return { text: `実行しませんでした（禁止・許可リスト）:\n${d.join("\n")}`, isError: true };
-  return { text: (await rcon.command(command)) || "(出力なし)" };
+  if (d.length) {
+    oplog.append({ server: c.name, tool: "run_command", status: "denied", summary: command.slice(0, 80), detail: d.join("; ") });
+    return { text: `実行しませんでした（禁止・許可リスト）:\n${d.join("\n")}`, isError: true };
+  }
+  const out = await c.rcon.command(command);
+  oplog.append({ server: c.name, tool: "run_command", status: "done", summary: command.slice(0, 80) });
+  return { text: out || "(出力なし)" };
 }));
 
 server.registerTool("get_player_pos", {
@@ -140,18 +149,23 @@ server.registerTool("run_commands", {
   description: "複数コマンドをまとめて実行する（最大 2000 件）。細かい装飾や家具の配置に使う。" +
     "禁止リストにあるコマンドが1つでもあると、全体を実行しない。このツールの操作は undo で戻せない（戻したい範囲は fill などで作る）。",
   inputSchema: { commands: z.array(z.string()).min(1).max(2000), server: serverArg },
-}, on(async ({ rcon }, { commands }: { commands: string[]; server?: string }) => runPlain(rcon, policy, commands)));
+}, on(async (c, { commands }: { commands: string[]; server?: string }) => runPlain(c.rcon, policy, commands, logTo(c, "run_commands"))));
 
 server.registerTool("undo", {
   description: "直前の書き換え（set_block / fill / build_*）を元に戻す。新しい順にしか戻せない。" +
     "run_command / run_commands の操作は対象外。履歴はサーバーごと。",
   inputSchema: { steps: z.number().int().min(1).max(50).default(1).describe("戻す操作の数"), server: serverArg },
-}, on(async ({ rcon, history }, { steps }: { steps: number; server?: string }) => undoOps(rcon, history, steps)));
+}, on(async (c, { steps }: { steps: number; server?: string }) => undoOps(c.rcon, c.history, steps, logTo(c, "undo"))));
 
 server.registerTool("list_history", {
   description: "undo で戻せる書き換えの履歴を新しい順に返す（サーバーごと）。",
   inputSchema: { server: serverArg },
 }, on(async ({ name, history }, _a: { server?: string }) => listOps(history, name)));
+
+server.registerTool("operation_log", {
+  description: "この MCP が行った操作のログを新しい順に返す（実行・ドライラン・拒否・失敗・undo）。履歴 ID は undo の履歴と同じ。",
+  inputSchema: { count: z.number().int().min(1).max(200).default(20), server: z.string().optional().describe("サーバー名で絞る。省くと全サーバー") },
+}, async ({ count, server }) => text(logOps(oplog, count, server).text));
 
 server.registerTool("inspect_region", {
   description: "範囲内のブロックの種類ごとの数を返す（読み取りのみ、ブロックは変えない）。" +

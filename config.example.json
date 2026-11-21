@@ -3,6 +3,7 @@
     "allow": [],
     "deny": ["stop", "op", "deop", "ban", "ban-ip", "pardon", "pardon-ip"]
   },
+  "log": { "enabled": true },
   "undo": {
     "enabled": true,
     "limit": 20,

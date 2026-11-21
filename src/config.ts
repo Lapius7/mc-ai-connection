@@ -12,6 +12,11 @@ const Settings = z.object({
     /** 前方一致で拒否する。省くと既定（stop/op/ban など）。[] にすると無効 */
     deny: z.array(z.string()).default(DEFAULT_DENY),
   }).default({ allow: [], deny: DEFAULT_DENY }),
+  log: z.object({
+    enabled: z.boolean().default(true),
+    /** ログのファイル。省くと MC_STATE_DIR の operations.jsonl（巻き戻し履歴と同じ場所） */
+    file: z.string().optional(),
+  }).default({ enabled: true }),
   undo: z.object({
     enabled: z.boolean().default(true),
     /** 履歴の保持件数（サーバーごと） */
