@@ -10,7 +10,7 @@ import { denied } from "./policy.ts";
 import { loadSettings, policyOf, STATE_DIR } from "./config.ts";
 import { History } from "./history.ts";
 import { formatSummary, summarizeRegion } from "./inspect.ts";
-import { listOps, logOps, mutate, runPlain, undoOps, type Result } from "./ops.ts";
+import { listOps, logOps, mutate, runPlain, undoOps, type Progress, type Result } from "./ops.ts";
 import { MARK, describePalette, paletteCmds, paletteFill, toPalette, type BlockInput } from "./palette.ts";
 import { planCommands } from "./plan.ts";
 import * as S from "./shapes.ts";
@@ -52,22 +52,38 @@ const seedArg = z.number().int().optional().describe("パレットの乱数の�
 
 const server = new McpServer({ name: "mc-ai-connection", version: "0.2.0" });
 
-type Ctx = { rcon: Rcon; name: string; history: History };
+type Ctx = { rcon: Rcon; name: string; history: History; progress?: Progress };
+/** ツールの呼び出しに付く extra のうち、進捗通知に使う部分 */
+type Extra = { _meta?: { progressToken?: string | number }; sendNotification: (n: any) => Promise<void> };
+
+/** クライアントが progressToken を付けてきたときだけ、MCP の進捗通知を送る */
+function progressOf(extra: Extra | undefined): Progress | undefined {
+  const token = extra?._meta?.progressToken;
+  if (token === undefined || !extra) return undefined;
+  return async (done, total) => {
+    try {
+      await extra.sendNotification({
+        method: "notifications/progress",
+        params: { progressToken: token, progress: done, total, message: `${done}/${total} コマンド` },
+      });
+    } catch { /* 通知に失敗しても建築は続ける */ }
+  };
+}
 const logTo = (c: Ctx, tool: string) => ({ log: oplog, server: c.name, tool });
 
 /** 各ツールの共通処理。サーバーを解決し、接続や設定の失敗は isError で返す */
 const on = <A extends { server?: string }>(fn: (c: Ctx, a: A) => Promise<Result>) =>
-  async (a: A) => {
+  async (a: A, extra?: Extra) => {
     try {
       const name = a.server ?? activeServer();
-      return toMcp(await fn({ rcon: await getRcon(a.server), name, history: historyFor(name) }, a));
+      return toMcp(await fn({ rcon: await getRcon(a.server), name, history: historyFor(name), progress: progressOf(extra) }, a));
     } catch (e) {
       return fail(e instanceof Error ? e.message : String(e));
     }
   };
 
 const build = (c: Ctx, tool: string, desc: string, cmds: string[], dryRun: boolean) =>
-  mutate({ rcon: c.rcon, policy, settings, history: c.history, log: oplog, server: c.name, version: serverVersion(c.name) }, tool, desc, cmds, dryRun);
+  mutate({ rcon: c.rcon, policy, settings, history: c.history, log: oplog, server: c.name, version: serverVersion(c.name), progress: c.progress }, tool, desc, cmds, dryRun);
 
 /** block が文字列ならそのまま、配列ならパレットで混ぜたコマンドにする */
 function withBlock(input: BlockInput, seed: number | undefined, plain: (b: string) => string[]) {

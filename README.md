@@ -162,6 +162,10 @@ When a server has a `version`, the write tools (`set_block`, `fill`, `build_*`, 
 
 `run_command` and `run_commands` are not translated; their command text is sent as written. Without a `version`, nothing is checked. The version is not detected from the server, because RCON has no vanilla command for it.
 
+## Progress
+
+For long operations (the write tools and `run_commands`), the server sends MCP `notifications/progress` while commands run, roughly every 5% or every second. A client only gets them if it sends a `progressToken` with the call; clients that do not are unaffected. The count is commands run, not blocks. The backup step before a write does not report progress.
+
 ## Block palettes
 
 Where a tool takes `block` (`set_block`, `fill`, `build_sphere`, `build_cylinder`, `build_line`), you can pass a list instead of one name to mix blocks by ratio:
@@ -223,7 +227,6 @@ pnpm start   # start the MCP server on stdio
 ## Roadmap
 
 - Translate command syntax differences for `run_command` (the write tools already handle block names, renames and heights)
-- Progress notifications during long builds
 - A companion MCP that reports a user's installed mods
 
 ## License

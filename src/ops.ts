@@ -15,14 +15,33 @@ const FAILED = /^(Unknown|Incorrect|Expected|Invalid|Could not|That position|No 
 const isFailure = (r: string) => FAILED.test(r) || /<--\[HERE\]/.test(r);
 
 /** コマンド列を順に実行し、要約だけ返す（出力を膨らませない） */
-export async function execAll(rcon: Runner, cmds: string[]): Promise<{ ok: number; errors: string[] }> {
+export type Progress = (done: number, total: number) => void | Promise<void>;
+
+/** 進捗を送る間隔: 全体の 5% ごと、または 1 秒ごと。最後は必ず送る */
+export function throttled(report: Progress, total: number, now: () => number = Date.now): Progress {
+  const step = Math.max(1, Math.floor(total / 20));
+  let lastN = 0, lastT = now();
+  return (done, t) => {
+    const nt = now();
+    if (done < t && done - lastN < step && nt - lastT < 1000) return;
+    lastN = done; lastT = nt;
+    return report(done, t);
+  };
+}
+
+export async function execAll(
+  rcon: Runner, cmds: string[], progress?: Progress,
+): Promise<{ ok: number; errors: string[] }> {
   let n = 0;
   const errors: string[] = [];
+  const report = progress && cmds.length > 1 ? throttled(progress, cmds.length) : undefined;
+  let i = 0;
   for (const c of cmds) {
     const r = await rcon.command(c);
     if (isFailure(r)) {
       if (errors.length < 3) errors.push(`${c} → ${r}`);
     } else n++;
+    await report?.(++i, cmds.length);
   }
   return { ok: n, errors };
 }
@@ -32,14 +51,14 @@ const summary = (cmds: string[], r: { ok: number; errors: string[] }) =>
 
 /** run_command / run_commands 用。巻き戻しの対象外で、禁止リストだけ適用する */
 export async function runPlain(
-  rcon: Runner, policy: Policy, cmds: string[], log?: LogTarget,
+  rcon: Runner, policy: Policy, cmds: string[], log?: LogTarget, progress?: Progress,
 ): Promise<Result> {
   const d = denied(policy, cmds);
   if (d.length) {
     log?.log.append({ server: log.server, tool: log.tool, status: "denied", summary: `${cmds.length} 件`, detail: d.join("; ") });
     return err(`実行しませんでした（禁止・許可リスト）:\n${d.join("\n")}`);
   }
-  const r = await execAll(rcon, cmds);
+  const r = await execAll(rcon, cmds, progress);
   log?.log.append({
     server: log.server, tool: log.tool, status: "done", summary: cmds[0]!.slice(0, 80) + (cmds.length > 1 ? " ほか" : ""),
     commands: cmds.length, succeeded: r.ok, detail: r.errors[0],
@@ -49,7 +68,7 @@ export async function runPlain(
 
 export type LogTarget = { log: OpLog; server: string; tool: string };
 
-export type MutateCtx = { rcon: Runner; policy: Policy; settings: Settings; history: History; log?: OpLog; server?: string; version?: string };
+export type MutateCtx = { rcon: Runner; policy: Policy; settings: Settings; history: History; log?: OpLog; server?: string; version?: string; progress?: Progress };
 
 /** fill / build_* / set_block 用。実行前に元ブロックを退避し、履歴に積む */
 export async function mutate(
@@ -94,7 +113,7 @@ export async function mutate(
     }
   }
   try {
-    const r = await execAll(ctx.rcon, cmds);
+    const r = await execAll(ctx.rcon, cmds, ctx.progress);
     rec({ status: "done", summary: desc, commands: cmds.length, succeeded: r.ok, historyId: entry?.id, detail: r.errors[0] });
     return ok(summary(cmds, r) + (entry ? `\n履歴 #${entry.id}（undo で元に戻せます）` : "") + notes);
   } catch (e) {
