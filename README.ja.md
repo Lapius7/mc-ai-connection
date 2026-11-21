@@ -1,10 +1,10 @@
 <div align="center">
 
-<p align="center"><a href="README.md">English</a> | <b>日本語</b></p>
-
 <p align="center">
   <img src="docs/images/banner.png" alt="MCP Minecraft Controller" width="100%">
 </p>
+
+<p align="center"><a href="README.md">English</a> | <b>日本語</b></p>
 
 <h3 align="center">AI に Minecraft の建築を任せられます。Mod は要らず、RCON でつなぎます。</h3>
 
