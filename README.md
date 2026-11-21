@@ -83,6 +83,7 @@ Every tool takes an optional `server` argument. `list_servers` shows what is reg
 | `MC_RCON_PASSWORD` | empty | RCON password |
 | `MC_MAX_VOLUME` | `200000` | Maximum number of blocks one operation may change |
 | `MC_MAX_PALETTE_BLOCKS` | `30000` | Maximum number of blocks one operation may mix with a palette |
+| `MC_MAX_COPY_COLUMNS` | `10000` | Maximum number of columns that `copy_region` may rotate or flip in one call |
 
 ## Settings file
 
@@ -119,6 +120,7 @@ The lists apply to every command the MCP sends, including the ones that `fill` a
 | `build_arch` | Semicircular arch with legs, thickness and depth |
 | `build_spiral_stairs` | Spiral stairs around an optional center pillar (one block up per step) |
 | `build_roof` | Gable or hip roof; `stairBlock` makes the gable slopes from facing stairs |
+| `copy_region` | Copy a region to another place with 90° rotation and x/z flips (server-side `clone`; block facing is not rotated) |
 | `build_walls` | Four walls with evenly spaced windows and a door opening (air; no door block) |
 | `undo` | Undo the latest writes (`steps` = how many). Newest first only |
 | `list_history` | List the writes `undo` can restore, per server |
@@ -197,6 +199,7 @@ pnpm start   # start the MCP server on stdio
 | `src/history.ts` | Backup before writing, and undo |
 | `src/ops.ts` | Shared flow for writes: policy, dry run, backup, run |
 | `src/palette.ts` | Mix blocks by ratio |
+| `src/copy.ts` | Copy/paste with rotation and flips as `clone` commands |
 | `src/shapes.ts` | Pyramid, arch, spiral stairs, roof, walls with windows |
 | `src/oplog.ts` | Operation log file |
 | `src/inspect.ts` | Block counts for a region |
@@ -206,7 +209,6 @@ pnpm start   # start the MCP server on stdio
 ## Roadmap
 
 - Paste a schematic (`.schem` / `.nbt`) at a position
-- Copy and paste a region, with rotation and flipping
 - Check block names per Minecraft version before running
 - Absorb command syntax differences between versions
 - Progress notifications during long builds

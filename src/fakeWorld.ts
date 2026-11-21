@@ -80,6 +80,7 @@ export class FakeWorld implements Runner {
         for (let x = 0; x < sx; x++) for (let y = 0; y < sy; y++) for (let z = 0; z < sz; z++) {
           const b = this.get(x1 + x, y1 + y, z1 + z);
           if (filter !== null && b !== filter) continue;
+          if (mode === "masked" && b === "air") continue;
           copies.push([dx + x, dy + y, dz + z, b]);
         }
         for (const [x, y, z, b] of copies) this.set(x, y, z, b);
