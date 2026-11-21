@@ -4,11 +4,9 @@
 
 An MCP server that lets AI assistants (Claude, Codex, and any other MCP client) build and operate on a Minecraft Java server over RCON. No mod is required.
 
-![AI client, MCP server, RCON, Minecraft server, drawn as isometric wireframe blocks](docs/images/flow.png)
+![A stone-brick cathedral built from Minecraft blocks, with the unfinished roof left as an amber wireframe](docs/images/hero.png)
 
 Ask for "a stone-brick tower next to Steve" or "a glass dome of radius 10 at the origin", and the AI turns it into server commands.
-
-![A block tower and a stepped pyramid in isometric wireframe](docs/images/builds.png)
 
 ## Highlights
 
