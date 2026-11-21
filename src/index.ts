@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import * as B from "./builders.ts";
-import { activeServer, getRcon, listServers, useServer } from "./servers.ts";
+import { activeServer, getRcon, listServers, serverVersion, useServer } from "./servers.ts";
 import type { Rcon } from "./rcon.ts";
 import { denied } from "./policy.ts";
 
@@ -67,7 +67,7 @@ const on = <A extends { server?: string }>(fn: (c: Ctx, a: A) => Promise<Result>
   };
 
 const build = (c: Ctx, tool: string, desc: string, cmds: string[], dryRun: boolean) =>
-  mutate({ rcon: c.rcon, policy, settings, history: c.history, log: oplog, server: c.name }, tool, desc, cmds, dryRun);
+  mutate({ rcon: c.rcon, policy, settings, history: c.history, log: oplog, server: c.name, version: serverVersion(c.name) }, tool, desc, cmds, dryRun);
 
 /** block が文字列ならそのまま、配列ならパレットで混ぜたコマンドにする */
 function withBlock(input: BlockInput, seed: number | undefined, plain: (b: string) => string[]) {
@@ -85,7 +85,7 @@ server.registerTool("list_servers", {
   description: "登録済みの Minecraft サーバーの一覧と、現在の既定のサーバーを返す。",
   inputSchema: {},
 }, async () => text(listServers()
-  .map((s) => `${s.active ? "*" : " "} ${s.name}  ${s.target}${s.description ? `  ${s.description}` : ""}`)
+  .map((s) => `${s.active ? "*" : " "} ${s.name}  ${s.target}${s.version ? `  [${s.version}]` : ""}${s.description ? `  ${s.description}` : ""}`)
   .join("\n")));
 
 server.registerTool("use_server", {

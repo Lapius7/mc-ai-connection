@@ -69,6 +69,7 @@ env = { MC_RCON_PASSWORD = "長くてランダムなパスワード" }
 | `host`, `port` | RCON のアドレス。`ssh` を指定したときは、SSH 先から見たアドレス |
 | `password` / `passwordEnv` | パスワード、またはパスワードを入れた環境変数の名前 |
 | `ssh` | 任意。`~/.ssh/config` のホスト名。MCP がトンネルを張るので、RCON のポートを公開しなくて済みます |
+| `version` | 任意。Minecraft のバージョン(例 `1.21.4` `26.1`)。ブロック名と高さの検査、名前の読み替えが有効になります(下の「バージョン」を参照)。環境変数だけで1台使う場合は `MC_VERSION` |
 | `description` | `list_servers` に出る説明 |
 | `default`(最上位) | 呼び出しに `server` がないときに使うサーバー |
 
@@ -151,6 +152,16 @@ env = { MC_RCON_PASSWORD = "長くてランダムなパスワード" }
 
 コマンドの文法は Minecraft のバージョンで変わります。たとえば 26.x では `time query daytime` が使えず、`time query day` になっています。エラーを AI に読ませて再試行させるか、先に `run_command` で確認するよう頼んでください。
 
+## バージョン
+
+サーバーに `version` を書くと、書き込み系のツール(`set_block` `fill` `build_*` `copy_region` `paste_schematic`)が、何かを書く前にコマンドを検査します。ドライランでも同じ結果が出ます。
+
+- **ブロック名**: そのバージョンにない名前は、「もしかして」つきで断ります。一覧は [minecraft-data](https://github.com/PrismarineJS/minecraft-data) の 1.16.5〜26.1 から作っています(`bun scripts/gen-blocks.ts` で `src/blocks.data.ts` を作り直せます)。一覧にない中間のバージョン(1.21.2 など)は、前後どちらかにある名前を通します。一覧より古い・新しいバージョンは検査せず、その旨を添えます。ほかの名前空間の名前と `#タグ` は検査しません。
+- **名前が変わったブロック**は、そのバージョンの名前に読み替えます: `grass_path`/`dirt_path`(1.17)、`grass`/`short_grass`(1.20.3)、`chain`/`iron_chain`(1.21.9)。どちらの向きにも読み替えます。
+- **高さ**: 1.18 より前は 0〜255、1.18 以降は -64〜319。
+
+`run_command` と `run_commands` は読み替えず、書いたとおりに送ります。`version` がなければ何も検査しません。バージョンはサーバーから取りません(RCON に標準のコマンドがないため)。
+
 ## ブロックパレット
 
 `block` を取るツール(`set_block` `fill` `build_sphere` `build_cylinder` `build_line`)には、名前のかわりに配列を渡すと、割合でブロックを混ぜられます。
@@ -202,6 +213,7 @@ pnpm start   # MCP サーバーを起動(標準入出力で待ち受ける)
 | `src/palette.ts` | 割合でブロックを混ぜる |
 | `src/copy.ts` | 回転・反転つきのコピーを `clone` に変える |
 | `src/nbt.ts` `src/schematic.ts` | `.schem` / `.nbt` を `fill` / `setblock` に変える |
+| `src/versions.ts` `src/validate.ts` | バージョンごとのブロック名・名前の変更・高さの検査 |
 | `src/shapes.ts` | ピラミッド・アーチ・らせん階段・屋根・窓つきの壁 |
 | `src/oplog.ts` | 操作ログのファイル |
 | `src/inspect.ts` | 範囲内のブロックの集計 |
@@ -210,8 +222,7 @@ pnpm start   # MCP サーバーを起動(標準入出力で待ち受ける)
 
 ## 今後の予定
 
-- 実行前に、Minecraft のバージョンごとのブロック名を検証する機能
-- バージョンによるコマンド文法の違いの吸収
+- `run_command` で送るコマンドの、バージョンによる文法の違いの吸収(書き込み系のツールは、ブロック名・名前の変更・高さまで対応済み)
 - 長い建築の進捗通知
 - ユーザーが入れている Mod を返す MCP(別に作る予定)
 

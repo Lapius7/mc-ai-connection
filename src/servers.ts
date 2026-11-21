@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import { Rcon } from "./rcon.ts";
+import { VERSION_RE } from "./versions.ts";
 
 const ServerConfig = z.object({
   host: z.string().default("127.0.0.1"),
@@ -14,6 +15,8 @@ const ServerConfig = z.object({
   /** 指定すると、この SSH ホスト（~/.ssh/config の名前）経由で RCON につなぐ。host と port は SSH 先から見た値 */
   ssh: z.string().optional(),
   description: z.string().optional(),
+  /** Minecraft のバージョン（例 "1.21.4"、"26.1"）。指定するとブロック名と高さを実行前に検査し、名前の変更を読み替える */
+  version: z.string().regex(VERSION_RE, "例: 1.21.4").optional(),
 });
 type ServerConfig = z.infer<typeof ServerConfig>;
 
@@ -41,6 +44,7 @@ function load(): { servers: Record<string, ServerConfig>; active: string } {
         host: process.env.MC_RCON_HOST ?? "127.0.0.1",
         port: Number(process.env.MC_RCON_PORT ?? 25575),
         password: process.env.MC_RCON_PASSWORD ?? "",
+        version: process.env.MC_VERSION || undefined,
       }),
     },
     active: "default",
@@ -56,6 +60,7 @@ const tunnels = new Map<string, Tunnel>();
 
 export const serverNames = () => Object.keys(state.servers);
 export const activeServer = () => active;
+export const serverVersion = (name: string) => state.servers[name]?.version;
 
 export function listServers() {
   return serverNames().map((name) => {
@@ -65,6 +70,7 @@ export function listServers() {
       active: name === active,
       target: c.ssh ? `ssh:${c.ssh} → ${c.host}:${c.port}` : `${c.host}:${c.port}`,
       description: c.description ?? "",
+      version: c.version ?? "",
     };
   });
 }

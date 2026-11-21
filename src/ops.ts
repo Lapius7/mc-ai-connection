@@ -5,6 +5,7 @@ import { backupBoxes, describeBox, planCommands } from "./plan.ts";
 import { denied, type Policy } from "./policy.ts";
 import { logLine, type LogRecord, type OpLog } from "./oplog.ts";
 import type { Runner } from "./types.ts";
+import { prepare } from "./validate.ts";
 
 export type Result = { text: string; isError?: boolean };
 const ok = (text: string): Result => ({ text });
@@ -48,14 +49,22 @@ export async function runPlain(
 
 export type LogTarget = { log: OpLog; server: string; tool: string };
 
-export type MutateCtx = { rcon: Runner; policy: Policy; settings: Settings; history: History; log?: OpLog; server?: string };
+export type MutateCtx = { rcon: Runner; policy: Policy; settings: Settings; history: History; log?: OpLog; server?: string; version?: string };
 
 /** fill / build_* / set_block 用。実行前に元ブロックを退避し、履歴に積む */
 export async function mutate(
-  ctx: MutateCtx, tool: string, desc: string, cmds: string[], dryRun: boolean,
+  ctx: MutateCtx, tool: string, desc: string, input: string[], dryRun: boolean,
 ): Promise<Result> {
+  // バージョンに合わせて、ブロック名・高さを検査し、名前の変更を読み替える
+  const prep = prepare(input, ctx.version);
+  const cmds = prep.cmds;
+  const notes = prep.notes.length ? `\n${prep.notes.join("\n")}` : "";
   const rec = (r: Omit<LogRecord, "time" | "server" | "tool">) =>
     ctx.log?.append({ server: ctx.server ?? "", tool, ...r });
+  if (prep.errors.length) {
+    rec({ status: "failed", summary: desc, detail: prep.errors.join("; ") });
+    return err(`実行しませんでした（バージョン ${ctx.version} の検査）:\n${prep.errors.join("\n")}${notes}`);
+  }
   const d = denied(ctx.policy, cmds);
   if (d.length) {
     rec({ status: "denied", summary: desc, detail: d.join("; ") });
@@ -72,7 +81,7 @@ export async function mutate(
       `コマンド ${plan.commands} 件 / 変更ブロック数 最大 ${plan.blocks}（hollow・outline・keep では実際はこれ以下）`,
       `範囲 ${describeBox(plan.bbox)}`,
       undo.enabled ? `巻き戻し用に ${boxes.length} 区画を退避します` : "巻き戻しは無効です",
-    ].join("\n"));
+    ].join("\n") + notes);
   }
 
   let entry: Entry | null = null;
@@ -87,7 +96,7 @@ export async function mutate(
   try {
     const r = await execAll(ctx.rcon, cmds);
     rec({ status: "done", summary: desc, commands: cmds.length, succeeded: r.ok, historyId: entry?.id, detail: r.errors[0] });
-    return ok(summary(cmds, r) + (entry ? `\n履歴 #${entry.id}（undo で元に戻せます）` : ""));
+    return ok(summary(cmds, r) + (entry ? `\n履歴 #${entry.id}（undo で元に戻せます）` : "") + notes);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     rec({ status: "failed", summary: desc, historyId: entry?.id, detail: msg });
