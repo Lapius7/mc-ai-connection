@@ -1,33 +1,46 @@
 // 形状 → Minecraft コマンドの列に変換する（純粋関数）
 export const MAX_VOLUME = Number(process.env.MC_MAX_VOLUME ?? 200_000);
-const FILL_LIMIT = 32_768;
+export const FILL_LIMIT = 32_768;
 
 export type Vec = [number, number, number];
-const lo = (a: Vec, b: Vec): Vec => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.min(a[2], b[2])];
-const hi = (a: Vec, b: Vec): Vec => [Math.max(a[0], b[0]), Math.max(a[1], b[1]), Math.max(a[2], b[2])];
+export const lo = (a: Vec, b: Vec): Vec => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.min(a[2], b[2])];
+export const hi = (a: Vec, b: Vec): Vec => [Math.max(a[0], b[0]), Math.max(a[1], b[1]), Math.max(a[2], b[2])];
 export const volume = (a: Vec, b: Vec) => {
   const l = lo(a, b), h = hi(a, b);
   return (h[0] - l[0] + 1) * (h[1] - l[1] + 1) * (h[2] - l[2] + 1);
 };
 
-/** /fill の 32768 上限に収まるよう Y 方向などで分割する */
-export function fillCmds(a: Vec, b: Vec, block: string, mode = ""): string[] {
+export type Box = { lo: Vec; hi: Vec };
+
+/** 1回の /fill・/clone に収まるよう、直方体を互いに重ならない小箱へ分割する */
+export function splitBox(a: Vec, b: Vec): Box[] {
   const l = lo(a, b), h = hi(a, b);
-  const out: string[] = [];
+  const out: Box[] = [];
   const dx = h[0] - l[0] + 1, dz = h[2] - l[2] + 1;
-  const layers = Math.max(1, Math.floor(FILL_LIMIT / (dx * dz)));
   if (dx * dz <= FILL_LIMIT) {
-    for (let y = l[1]; y <= h[1]; y += layers) {
-      out.push(`fill ${l[0]} ${y} ${l[2]} ${h[0]} ${Math.min(h[1], y + layers - 1)} ${h[2]} ${block} ${mode}`.trim());
-    }
-  } else {
+    const layers = Math.max(1, Math.floor(FILL_LIMIT / (dx * dz)));
+    for (let y = l[1]; y <= h[1]; y += layers)
+      out.push({ lo: [l[0], y, l[2]], hi: [h[0], Math.min(h[1], y + layers - 1), h[2]] });
+  } else if (dz <= FILL_LIMIT) {
     // 底面が大きい場合は X 方向にも切る
     const step = Math.max(1, Math.floor(FILL_LIMIT / dz));
     for (let y = l[1]; y <= h[1]; y++)
       for (let x = l[0]; x <= h[0]; x += step)
-        out.push(`fill ${x} ${y} ${l[2]} ${Math.min(h[0], x + step - 1)} ${y} ${h[2]} ${block} ${mode}`.trim());
+        out.push({ lo: [x, y, l[2]], hi: [Math.min(h[0], x + step - 1), y, h[2]] });
+  } else {
+    // Z だけで上限を超える細長い範囲は、Z 方向にも切る
+    for (let y = l[1]; y <= h[1]; y++)
+      for (let x = l[0]; x <= h[0]; x++)
+        for (let z = l[2]; z <= h[2]; z += FILL_LIMIT)
+          out.push({ lo: [x, y, z], hi: [x, y, Math.min(h[2], z + FILL_LIMIT - 1)] });
   }
   return out;
+}
+
+/** /fill の 32768 上限に収まるよう Y 方向などで分割する */
+export function fillCmds(a: Vec, b: Vec, block: string, mode = ""): string[] {
+  return splitBox(a, b).map((x) =>
+    `fill ${x.lo.join(" ")} ${x.hi.join(" ")} ${block} ${mode}`.trim());
 }
 
 export function boxCmds(a: Vec, b: Vec, block: string, hollow: boolean): string[] {
