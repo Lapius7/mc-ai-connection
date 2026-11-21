@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fillCmds, sphereCmds } from "./builders.ts";
@@ -8,7 +8,8 @@ import { loadSettings } from "./config.ts";
 import { FakeWorld } from "./fakeWorld.ts";
 import { History } from "./history.ts";
 import { formatSummary, summarizeRegion } from "./inspect.ts";
-import { listOps, mutate, runPlain, undoOps } from "./ops.ts";
+import { listOps, logOps, mutate, runPlain, undoOps } from "./ops.ts";
+import { OpLog } from "./oplog.ts";
 import { DEFAULT_DENY } from "./policy.ts";
 
 let dir: string;
@@ -182,5 +183,32 @@ describe("inspect_region", () => {
     const box = { lo: [0, 0, 0] as [number, number, number], hi: [199, 1, 199] as [number, number, number] };
     const s = await summarizeRegion(world, box, [29_000_000, 0, 28_000_000], ["stone"], wait);
     expect(s.counts).toEqual([["stone", 1]]);
+  });
+});
+
+describe("操作ログ", () => {
+  test("実行・ドライラン・拒否・undo を記録し、履歴 ID で突き合わせられる", async () => {
+    const log = new OpLog(join(dir, "ops.jsonl"));
+    const h = mk();
+    const c = { ...ctx(h), log, server: "s1" };
+    await mutate(c, "fill", "a", ["fill 0 0 0 1 0 1 stone"], true);
+    await mutate(c, "fill", "b", ["fill 0 0 0 1 0 1 stone"], false);
+    await mutate({ ...c, policy: { allow: [], deny: ["fill"] } }, "fill", "c", ["fill 0 0 0 1 0 1 stone"], false);
+    await runPlain(world, c.policy, ["say hi", "setblock 0 0 0 dirt"], { log, server: "s1", tool: "run_commands" });
+    await undoOps(world, h, 1, { log, server: "s1", tool: "undo" });
+    const r = log.tail(10);
+    expect(r.map((x) => x.status)).toEqual(["undo", "done", "denied", "done", "dry-run"]);
+    expect(r[3]!.historyId).toBeGreaterThan(0);
+    expect(r[0]!.historyId).toBe(r[3]!.historyId);
+    expect(log.tail(10, "other")).toEqual([]);
+    expect(logOps(log, 3).text).toContain("undo");
+  });
+  test("無効なときは何も書かず、壊れた行があっても読める", () => {
+    expect(new OpLog(null).tail(5)).toEqual([]);
+    const f = join(dir, "bad.jsonl");
+    writeFileSync(f, "not json\n");
+    const log = new OpLog(f);
+    log.append({ server: "s", tool: "t", status: "done", summary: "x" });
+    expect(log.tail(5).length).toBe(1);
   });
 });

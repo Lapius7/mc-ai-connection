@@ -91,6 +91,8 @@ Behavior settings live in `~/.config/mc-ai-connection/config.json` (override the
 |---|---|---|
 | `commands.deny` | `stop`, `op`, `deop`, `ban`, `ban-ip`, `pardon`, `pardon-ip` | Commands that are refused. Matched by prefix on words, so `"time set"` works. Set `[]` to allow everything |
 | `commands.allow` | `[]` | If not empty, only commands matching an entry run. `deny` wins over `allow` |
+| `log.enabled` | `true` | Write the operation log |
+| `log.file` | `operations.jsonl` in `MC_STATE_DIR` | Where the log goes |
 | `undo.enabled` | `true` | Save original blocks before each write so it can be undone |
 | `undo.limit` | `20` | History entries kept per server. Older ones are dropped |
 | `undo.origin` | `[29000000, 29000000]` | `[x, z]` of the backup area (see Undo). Keep it inside the world border |
@@ -114,6 +116,7 @@ The lists apply to every command the MCP sends, including the ones that `fill` a
 | `build_line` | Draw a 3D line between two points |
 | `undo` | Undo the latest writes (`steps` = how many). Newest first only |
 | `list_history` | List the writes `undo` can restore, per server |
+| `operation_log` | Show the latest log entries (runs, dry runs, refusals, failures, undos) |
 | `inspect_region` | Count blocks by type in a region (read only) |
 
 `set_block`, `fill`, and `build_*` take `dryRun: true`, which runs nothing and returns the command count, the most blocks that could change, and the bounding box.
@@ -138,6 +141,10 @@ Coordinates are absolute integers in the form `[x, y, z]`. Blocks accept block s
 **Command syntax errors**
 
 Command syntax changes between Minecraft versions. For example, in 26.x `time query daytime` no longer exists and you use `time query day`. Let the AI read the error and retry, or ask it to check the command with `run_command` first.
+
+## Operation log
+
+Every call that runs or refuses commands is appended to `operations.jsonl` (one JSON object per line: time, server, tool, status, summary, command counts). By default it sits next to the undo history in `MC_STATE_DIR`, and each entry carries the history ID (`historyId`), so you can match a log line to an `undo` entry. The file is rotated to `operations.jsonl.1` at 5 MB.
 
 ## Undo
 
@@ -173,13 +180,13 @@ pnpm start   # start the MCP server on stdio
 | `src/plan.ts` | Works out which blocks a command list changes |
 | `src/history.ts` | Backup before writing, and undo |
 | `src/ops.ts` | Shared flow for writes: policy, dry run, backup, run |
+| `src/oplog.ts` | Operation log file |
 | `src/inspect.ts` | Block counts for a region |
 | `src/config.ts` | Settings file |
 | `src/index.ts` | MCP tool definitions |
 
 ## Roadmap
 
-- A log file of operations
 - More shapes: pyramid, arch, spiral stairs, roof, walls with windows
 - Paste a schematic (`.schem` / `.nbt`) at a position
 - Copy and paste a region, with rotation and flipping
