@@ -1,0 +1,12 @@
+{
+  "commands": {
+    "allow": [],
+    "deny": ["stop", "op", "deop", "ban", "ban-ip", "pardon", "pardon-ip"]
+  },
+  "undo": {
+    "enabled": true,
+    "limit": 20,
+    "origin": [29000000, 29000000],
+    "maxVolume": 2000000
+  }
+}

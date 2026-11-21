@@ -83,6 +83,21 @@ Every tool takes an optional `server` argument. `list_servers` shows what is reg
 | `MC_RCON_PASSWORD` | empty | RCON password |
 | `MC_MAX_VOLUME` | `200000` | Maximum number of blocks one operation may change |
 
+## Settings file
+
+Behavior settings live in `~/.config/mc-ai-connection/config.json` (override the path with `MC_CONFIG_FILE`). See [`config.example.json`](config.example.json). Every field is optional.
+
+| Field | Default | Description |
+|---|---|---|
+| `commands.deny` | `stop`, `op`, `deop`, `ban`, `ban-ip`, `pardon`, `pardon-ip` | Commands that are refused. Matched by prefix on words, so `"time set"` works. Set `[]` to allow everything |
+| `commands.allow` | `[]` | If not empty, only commands matching an entry run. `deny` wins over `allow` |
+| `undo.enabled` | `true` | Save original blocks before each write so it can be undone |
+| `undo.limit` | `20` | History entries kept per server. Older ones are dropped |
+| `undo.origin` | `[29000000, 29000000]` | `[x, z]` of the backup area (see Undo). Keep it inside the world border |
+| `undo.maxVolume` | `2000000` | Largest number of blocks one operation may back up |
+
+The lists apply to every command the MCP sends, including the ones that `fill` and `build_*` generate, and to the command after `run` in `execute ... run <command>`. The history lives in `MC_STATE_DIR` (default `~/.local/state/mc-ai-connection`).
+
 ## Tools
 
 | Tool | Description |
@@ -97,6 +112,11 @@ Every tool takes an optional `server` argument. `list_servers` shows what is reg
 | `build_sphere` | Build a sphere (radius 1 to 60), optionally hollow |
 | `build_cylinder` | Build a cylinder (radius 1 to 60, height 1 to 320), optionally hollow |
 | `build_line` | Draw a 3D line between two points |
+| `undo` | Undo the latest writes (`steps` = how many). Newest first only |
+| `list_history` | List the writes `undo` can restore, per server |
+| `inspect_region` | Count blocks by type in a region (read only) |
+
+`set_block`, `fill`, and `build_*` take `dryRun: true`, which runs nothing and returns the command count, the most blocks that could change, and the bounding box.
 
 Coordinates are absolute integers in the form `[x, y, z]`. Blocks accept block states, such as `oak_stairs[facing=north]`. Shape tools return a short summary (commands run, succeeded, sample failures) instead of dumping every response.
 
@@ -119,17 +139,28 @@ Coordinates are absolute integers in the form `[x, y, z]`. Blocks accept block s
 
 Command syntax changes between Minecraft versions. For example, in 26.x `time query daytime` no longer exists and you use `time query day`. Let the AI read the error and retry, or ask it to check the command with `run_command` first.
 
+## Undo
+
+Before `set_block`, `fill`, and `build_*` write, the MCP copies the region to a backup area with `/clone`, so block states and block entities such as chest contents come back exactly. The backup area is far from the spawn (`undo.origin`) and its chunks are force-loaded only while an entry is kept. `undo` copies it back and clears the backup.
+
+- History is per server and per operation. Entries can only be undone newest first, because restoring an old one under a newer overlapping build would corrupt the world.
+- If the backup fails, nothing is written. If the restore fails, the entry is kept so you can retry.
+- The region must be loaded, because `/clone` needs loaded chunks. Everything runs in the dimension RCON commands use (the overworld).
+- `run_command` and `run_commands` are **not** covered. The MCP cannot know what an arbitrary command changes. Build the part you may want back with `fill` or `build_*`.
+- Entities (mobs, dropped items) are not saved.
+
 ## Safety
 
 - RCON is unencrypted and has full control of the server. Never expose the RCON port to the internet. Use a strong password and a firewall.
-- `run_command` also allows dangerous commands such as `stop`, `op`, and `ban`. Only connect to servers you own.
-- There is no undo. Back up the world before large builds. `MC_MAX_VOLUME` refuses oversized single operations.
+- `stop`, `op`, `ban`, and similar commands are refused by default (see the settings file). Only connect to servers you own, and tighten `commands.allow` if the AI should do less.
+- `undo` covers `set_block`, `fill`, and `build_*` only. Back up the world before large builds, and before anything done through `run_command`. `MC_MAX_VOLUME` refuses oversized single operations.
 - Only server-side commands are available. Client-side actions such as camera, movement, and screenshots are out of scope.
 
 ## Development
 
 ```sh
-pnpm check   # type check
+pnpm check   # type check and unit tests (no server needed)
+pnpm test    # unit tests only
 pnpm start   # start the MCP server on stdio
 ```
 
@@ -138,12 +169,24 @@ pnpm start   # start the MCP server on stdio
 | `src/rcon.ts` | Minimal RCON client |
 | `src/servers.ts` | Server registry, config file, SSH tunnels |
 | `src/builders.ts` | Pure functions that turn shapes into command lists |
+| `src/policy.ts` | Command allow list and deny list |
+| `src/plan.ts` | Works out which blocks a command list changes |
+| `src/history.ts` | Backup before writing, and undo |
+| `src/ops.ts` | Shared flow for writes: policy, dry run, backup, run |
+| `src/inspect.ts` | Block counts for a region |
+| `src/config.ts` | Settings file |
 | `src/index.ts` | MCP tool definitions |
 
 ## Roadmap
 
-- Undo by saving a region before it is overwritten
-- A command allow list and deny list
+- A log file of operations
+- More shapes: pyramid, arch, spiral stairs, roof, walls with windows
+- Paste a schematic (`.schem` / `.nbt`) at a position
+- Copy and paste a region, with rotation and flipping
+- Block palettes that mix blocks by ratio
+- Check block names per Minecraft version before running
+- Absorb command syntax differences between versions
+- Progress notifications during long builds
 - A companion MCP that reports a user's installed mods
 
 ## License

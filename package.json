@@ -8,7 +8,8 @@
   "description": "MCP server that lets AI build and operate on a Minecraft server via RCON",
   "scripts": {
     "start": "bun run src/index.ts",
-    "check": "bunx tsc --noEmit"
+    "test": "bun test",
+    "check": "bunx tsc --noEmit && bun test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
