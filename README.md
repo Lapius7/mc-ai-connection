@@ -100,7 +100,7 @@ Behavior settings live in `~/.config/mc-ai-connection/config.json` (override the
 | `undo.origin` | `[29000000, 29000000]` | `[x, z]` of the backup area (see Undo). Keep it inside the world border |
 | `undo.maxVolume` | `2000000` | Largest number of blocks one operation may back up |
 
-The lists apply to every command the MCP sends, including the ones that `fill` and `build_*` generate, and to the command after `run` in `execute ... run <command>`. The history lives in `MC_STATE_DIR` (default `~/.local/state/mc-ai-connection`).
+The lists apply to the commands you or the AI ask for: `run_command`, `run_commands`, and the ones that `fill` and `build_*` generate, including the command after `run` in `execute ... run <command>`. The MCP's own internal commands (the `clone` and `forceload` that undo and `inspect_region` use, and the `data get` behind `get_player_pos`) are not checked, so a deny rule on `clone` does not break undo. The history lives in `MC_STATE_DIR` (default `~/.local/state/mc-ai-connection`).
 
 ## Tools
 

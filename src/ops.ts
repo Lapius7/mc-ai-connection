@@ -51,7 +51,13 @@ export type LogTarget = { log: OpLog; server: string; tool: string };
 export type MutateCtx = { rcon: Runner; policy: Policy; settings: Settings; history: History; log?: OpLog; server?: string };
 
 /** fill / build_* / set_block 用。実行前に元ブロックを退避し、履歴に積む */
-export async function mutate(
+export function mutate(
+  ctx: MutateCtx, tool: string, desc: string, cmds: string[], dryRun: boolean,
+): Promise<Result> {
+  return ctx.history.exclusive(() => mutateNow(ctx, tool, desc, cmds, dryRun));
+}
+
+async function mutateNow(
   ctx: MutateCtx, tool: string, desc: string, cmds: string[], dryRun: boolean,
 ): Promise<Result> {
   const rec = (r: Omit<LogRecord, "time" | "server" | "tool">) =>
@@ -95,7 +101,11 @@ export async function mutate(
   }
 }
 
-export async function undoOps(rcon: Runner, history: History, steps: number, log?: LogTarget): Promise<Result> {
+export function undoOps(rcon: Runner, history: History, steps: number, log?: LogTarget): Promise<Result> {
+  return history.exclusive(() => undoNow(rcon, history, steps, log));
+}
+
+async function undoNow(rcon: Runner, history: History, steps: number, log?: LogTarget): Promise<Result> {
   if (history.list().length === 0) return err("戻せる履歴がありません");
   const r = await history.undo(rcon, steps);
   for (const e of r.restored) log?.log.append({ server: log.server, tool: "undo", status: "undo", summary: `${e.tool}: ${e.summary}`, historyId: e.id });
