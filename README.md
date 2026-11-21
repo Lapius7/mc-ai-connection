@@ -121,6 +121,7 @@ The lists apply to the commands you or the AI ask for: `run_command`, `run_comma
 | `build_spiral_stairs` | Spiral stairs around an optional center pillar (one block up per step) |
 | `build_roof` | Gable or hip roof; `stairBlock` makes the gable slopes from facing stairs |
 | `copy_region` | Copy a region to another place with 90° rotation and x/z flips (server-side `clone`; block facing is not rotated) |
+| `paste_schematic` | Paste a `.schem` (Sponge v2/v3) or structure `.nbt` file at given coordinates (block entity NBT such as chest contents is not pasted) |
 | `build_walls` | Four walls with evenly spaced windows and a door opening (air; no door block) |
 | `undo` | Undo the latest writes (`steps` = how many). Newest first only |
 | `list_history` | List the writes `undo` can restore, per server |
@@ -200,6 +201,7 @@ pnpm start   # start the MCP server on stdio
 | `src/ops.ts` | Shared flow for writes: policy, dry run, backup, run |
 | `src/palette.ts` | Mix blocks by ratio |
 | `src/copy.ts` | Copy/paste with rotation and flips as `clone` commands |
+| `src/nbt.ts`, `src/schematic.ts` | Read `.schem` / `.nbt` into `fill` / `setblock` |
 | `src/shapes.ts` | Pyramid, arch, spiral stairs, roof, walls with windows |
 | `src/oplog.ts` | Operation log file |
 | `src/inspect.ts` | Block counts for a region |
@@ -208,7 +210,6 @@ pnpm start   # start the MCP server on stdio
 
 ## Roadmap
 
-- Paste a schematic (`.schem` / `.nbt`) at a position
 - Check block names per Minecraft version before running
 - Absorb command syntax differences between versions
 - Progress notifications during long builds
