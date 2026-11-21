@@ -15,6 +15,7 @@ import { MARK, describePalette, paletteCmds, paletteFill, toPalette, type BlockI
 import { planCommands } from "./plan.ts";
 import * as S from "./shapes.ts";
 import { copyCmds, resultSize } from "./copy.ts";
+import { loadSchematic, schematicCmds } from "./schematic.ts";
 import { OpLog } from "./oplog.ts";
 import { join } from "node:path";
 import { hi, lo } from "./builders.ts";
@@ -261,6 +262,29 @@ server.registerTool("copy_region", {
   catch (e) { return { text: e instanceof Error ? e.message : String(e), isError: true }; }
   const sz = resultSize(from, to, rotate);
   return build(c, "copy_region", `${from.join(",")} → ${to.join(",")} を ${dest.join(",")} へ（${sz.join("×")}、回転 ${rotate}${flipX ? " x反転" : ""}${flipZ ? " z反転" : ""}）`, cmds, dryRun);
+}));
+
+server.registerTool("paste_schematic", {
+  description: "スキーマティックを指定の座標に貼り付ける。.schem（Sponge v2/v3）とストラクチャーの .nbt に対応（旧 .schematic は不可）。" +
+    "path は MCP サーバーを動かしているマシン上のファイル。origin は貼り付け後の箱の最小の角。チェストの中身などブロックエンティティの NBT は貼り付けない（ブロック自体は置く）。" +
+    "回転・反転はしない（必要なら先に貼ってから copy_region）。undo で戻せる。",
+  inputSchema: {
+    path: z.string().describe(".schem または .nbt のファイルパス"), origin: vec,
+    includeAir: z.boolean().default(false).describe("true なら空気も置いて、貼り付け先を空にする"),
+    dryRun: dryRunArg, server: serverArg,
+  },
+}, on(async (c, { path, origin, includeAir, dryRun }: any) => {
+  let cmds: string[], note = "";
+  try {
+    const s = loadSchematic(path);
+    const g = guard(s.size[0] * s.size[1] * s.size[2]);
+    if (g) return g;
+    cmds = schematicCmds(s, origin, includeAir);
+    if (cmds.length === 0) return { text: "置くブロックがありません（空気だけのスキーマティックです）", isError: true };
+    if (s.blockEntitiesSkipped) note = `\n注意: ブロックエンティティ ${s.blockEntitiesSkipped} 個の NBT（中身など）は貼り付けていません`;
+    const r = await build(c, "paste_schematic", `${path.split("/").pop()}（${s.size.join("×")}）を ${origin.join(",")} へ`, cmds, dryRun);
+    return { ...r, text: r.text + note };
+  } catch (e) { return { text: e instanceof Error ? e.message : String(e), isError: true }; }
 }));
 
 server.registerTool("run_commands", {
