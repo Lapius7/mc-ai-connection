@@ -11,6 +11,7 @@ import { loadSettings, policyOf, STATE_DIR } from "./config.ts";
 import { History } from "./history.ts";
 import { formatSummary, summarizeRegion } from "./inspect.ts";
 import { listOps, logOps, mutate, runPlain, undoOps, type Result } from "./ops.ts";
+import { describePalette, paletteCmds, paletteFill, toPalette, type BlockInput } from "./palette.ts";
 import { OpLog } from "./oplog.ts";
 import { join } from "node:path";
 import { hi, lo } from "./builders.ts";
@@ -38,7 +39,12 @@ const dryRunArg = z.boolean().default(false)
   .describe("true なら実行せず、変更ブロック数と範囲だけ返す");
 const num = z.number().int();
 const vec = z.tuple([num, num, num]).describe("[x, y, z] の絶対座標");
-const block = z.string().describe("例: stone, oak_planks, minecraft:glass, oak_stairs[facing=north]");
+const blockOne = z.string().describe("例: stone, oak_planks, minecraft:glass, oak_stairs[facing=north]");
+const block = z.union([
+  blockOne,
+  z.array(z.object({ block: blockOne, weight: z.number().positive().default(1).describe("割合。合計が100でなくてよい") })).min(1).max(20),
+]).describe("ブロック名。配列で渡すと割合で混ぜる（例: [{block:\"stone_bricks\",weight:70},{block:\"mossy_stone_bricks\",weight:30}]）");
+const seedArg = z.number().int().optional().describe("パレットの乱数の種。同じ値なら同じ並びになる");
 
 const server = new McpServer({ name: "mc-ai-connection", version: "0.2.0" });
 
@@ -58,6 +64,12 @@ const on = <A extends { server?: string }>(fn: (c: Ctx, a: A) => Promise<Result>
 
 const build = (c: Ctx, tool: string, desc: string, cmds: string[], dryRun: boolean) =>
   mutate({ rcon: c.rcon, policy, settings, history: c.history, log: oplog, server: c.name }, tool, desc, cmds, dryRun);
+
+/** block が文字列ならそのまま、配列ならパレットで混ぜたコマンドにする */
+function withBlock(input: BlockInput, seed: number | undefined, plain: (b: string) => string[]) {
+  const pal = toPalette(input);
+  return pal ? { cmds: paletteCmds(plain("stone"), pal, seed ?? 1), label: describePalette(pal) } : { cmds: plain(input as string), label: input as string };
+}
 
 function guard(volume: number): Result | null {
   return volume > B.MAX_VOLUME
@@ -112,38 +124,56 @@ server.registerTool("get_player_pos", {
 server.registerTool("set_block", {
   description: "ブロックを1つ置く。実行前に元のブロックを保存し、undo で戻せる。",
   inputSchema: { pos: vec, block, dryRun: dryRunArg, server: serverArg },
-}, on(async (c, { pos, block, dryRun }: { pos: number[]; block: string; dryRun: boolean; server?: string }) =>
-  build(c, "set_block", `${pos.join(",")} ${block}`, [`setblock ${pos.join(" ")} ${block}`], dryRun)));
+}, on(async (c, { pos, block, dryRun }: { pos: number[]; block: BlockInput; dryRun: boolean; server?: string }) => {
+  const r = withBlock(block, 1, (b) => [`setblock ${pos.join(" ")} ${b}`]);
+  return build(c, "set_block", `${pos.join(",")} ${r.label}`, r.cmds, dryRun);
+}));
 
 server.registerTool("fill", {
   description: "直方体を埋める。大きい場合は自動で分割する。mode: replace/hollow/outline/keep/destroy。" +
-    "実行前に元のブロックを保存し、undo で戻せる。",
+    "block を配列にすると割合で混ぜる（mode は replace / hollow / outline のみ）。実行前に元のブロックを保存し、undo で戻せる。",
   inputSchema: {
     from: vec, to: vec, block,
     mode: z.enum(["replace", "hollow", "outline", "keep", "destroy"]).default("replace"),
+    seed: seedArg,
     dryRun: dryRunArg,
     server: serverArg,
   },
-}, on(async (c, { from, to, block, mode, dryRun }: any) =>
-  guard(B.volume(from, to)) ?? build(c, "fill", `${from.join(",")} → ${to.join(",")} ${block} ${mode}`, B.fillCmds(from, to, block, mode), dryRun)));
+}, on(async (c, { from, to, block, mode, seed, dryRun }: any) => {
+  const g = guard(B.volume(from, to));
+  if (g) return g;
+  const pal = toPalette(block);
+  const cmds = pal ? paletteFill(from, to, mode, pal, seed ?? 1) : B.fillCmds(from, to, block, mode);
+  return build(c, "fill", `${from.join(",")} → ${to.join(",")} ${pal ? describePalette(pal) : block} ${mode}`, cmds, dryRun);
+}));
 
 server.registerTool("build_sphere", {
-  description: "球を作る。中心と半径を指定。hollow=true で空洞。実行前に元のブロックを保存し、undo で戻せる。",
-  inputSchema: { center: vec, radius: z.number().int().min(1).max(60), block, hollow: z.boolean().default(false), dryRun: dryRunArg, server: serverArg },
-}, on(async (c, { center, radius, block, hollow, dryRun }: any) =>
-  guard(((4 / 3) * Math.PI * radius ** 3) | 0) ?? build(c, "build_sphere", `中心 ${center.join(",")} 半径 ${radius} ${block}`, B.sphereCmds(center, radius, block, hollow), dryRun)));
+  description: "球を作る。中心と半径を指定。hollow=true で空洞。block を配列にすると割合で混ぜる。実行前に元のブロックを保存し、undo で戻せる。",
+  inputSchema: { center: vec, radius: z.number().int().min(1).max(60), block, hollow: z.boolean().default(false), seed: seedArg, dryRun: dryRunArg, server: serverArg },
+}, on(async (c, { center, radius, block, hollow, seed, dryRun }: any) => {
+  const g = guard(((4 / 3) * Math.PI * radius ** 3) | 0);
+  if (g) return g;
+  const r = withBlock(block, seed, (b) => B.sphereCmds(center, radius, b, hollow));
+  return build(c, "build_sphere", `中心 ${center.join(",")} 半径 ${radius} ${r.label}`, r.cmds, dryRun);
+}));
 
 server.registerTool("build_cylinder", {
-  description: "円柱を作る。base は底面の中心、height は高さ。塔や柱に使う。実行前に元のブロックを保存し、undo で戻せる。",
-  inputSchema: { base: vec, radius: z.number().int().min(1).max(60), height: z.number().int().min(1).max(320), block, hollow: z.boolean().default(false), dryRun: dryRunArg, server: serverArg },
-}, on(async (c, { base, radius, height, block, hollow, dryRun }: any) =>
-  guard(Math.PI * radius * radius * height | 0) ?? build(c, "build_cylinder", `底面中心 ${base.join(",")} 半径 ${radius} 高さ ${height} ${block}`, B.cylinderCmds(base, radius, height, block, hollow), dryRun)));
+  description: "円柱を作る。base は底面の中心、height は高さ。塔や柱に使う。block を配列にすると割合で混ぜる。実行前に元のブロックを保存し、undo で戻せる。",
+  inputSchema: { base: vec, radius: z.number().int().min(1).max(60), height: z.number().int().min(1).max(320), block, hollow: z.boolean().default(false), seed: seedArg, dryRun: dryRunArg, server: serverArg },
+}, on(async (c, { base, radius, height, block, hollow, seed, dryRun }: any) => {
+  const g = guard(Math.PI * radius * radius * height | 0);
+  if (g) return g;
+  const r = withBlock(block, seed, (b) => B.cylinderCmds(base, radius, height, b, hollow));
+  return build(c, "build_cylinder", `底面中心 ${base.join(",")} 半径 ${radius} 高さ ${height} ${r.label}`, r.cmds, dryRun);
+}));
 
 server.registerTool("build_line", {
-  description: "2点間に直線を引く（橋・柱・梁など）。実行前に元のブロックを保存し、undo で戻せる。",
-  inputSchema: { from: vec, to: vec, block, dryRun: dryRunArg, server: serverArg },
-}, on(async (c, { from, to, block, dryRun }: any) =>
-  build(c, "build_line", `${from.join(",")} → ${to.join(",")} ${block}`, B.lineCmds(from, to, block), dryRun)));
+  description: "2点間に直線を引く（橋・柱・梁など）。block を配列にすると割合で混ぜる。実行前に元のブロックを保存し、undo で戻せる。",
+  inputSchema: { from: vec, to: vec, block, seed: seedArg, dryRun: dryRunArg, server: serverArg },
+}, on(async (c, { from, to, block, seed, dryRun }: any) => {
+  const r = withBlock(block, seed, (b) => B.lineCmds(from, to, b));
+  return build(c, "build_line", `${from.join(",")} → ${to.join(",")} ${r.label}`, r.cmds, dryRun);
+}));
 
 server.registerTool("run_commands", {
   description: "複数コマンドをまとめて実行する（最大 2000 件）。細かい装飾や家具の配置に使う。" +
