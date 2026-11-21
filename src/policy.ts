@@ -10,12 +10,15 @@ const words = (s: string) =>
 
 /** execute / return の run 以降を含め、実際に走りうるコマンドをすべて取り出す */
 export function effectiveCommands(cmd: string): string[][] {
-  const w = words(cmd);
-  const out: string[][] = [w];
-  if (w[0] !== "execute" && w[0] !== "return") return out;
-  w.forEach((t, i) => {
-    if (t === "run" && i > 0 && i + 1 < w.length) out.push(...effectiveCommands(w.slice(i + 1).join(" ")));
-  });
+  let cur = words(cmd);
+  const out: string[][] = [cur];
+  // 最初の run の後ろだけが子コマンド。その先の引数（say の本文など）は探さない。1段ごとに1回だけ処理する
+  while (cur[0] === "execute" || cur[0] === "return") {
+    const i = cur.indexOf("run", 1);
+    if (i < 0 || i + 1 >= cur.length) break;
+    cur = words(cur.slice(i + 1).join(" "));
+    out.push(cur);
+  }
   return out;
 }
 

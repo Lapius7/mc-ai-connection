@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fillCmds, sphereCmds } from "./builders.ts";
+import { fillCmds, splitBox, sphereCmds, volume } from "./builders.ts";
 import type { Settings } from "./config.ts";
 import { loadSettings } from "./config.ts";
 import { FakeWorld } from "./fakeWorld.ts";
@@ -10,7 +10,7 @@ import { History } from "./history.ts";
 import { formatSummary, summarizeRegion } from "./inspect.ts";
 import { listOps, logOps, mutate, runPlain, throttled, undoOps } from "./ops.ts";
 import { OpLog } from "./oplog.ts";
-import { DEFAULT_DENY } from "./policy.ts";
+import { check, DEFAULT_DENY, effectiveCommands } from "./policy.ts";
 
 let dir: string;
 let world: FakeWorld;
@@ -244,5 +244,59 @@ describe("進捗通知", () => {
     const seen: number[] = [];
     await runPlain(world, { allow: [], deny: DEFAULT_DENY }, Array.from({ length: 40 }, (_, i) => `setblock ${i} 0 0 dirt`), undefined, (d) => { seen.push(d); });
     expect(seen.at(-1)).toBe(40);
+  });
+});
+
+describe("レビュー指摘の修正", () => {
+  test("Z だけで上限を超える範囲も 32768 以下に分割する", () => {
+    const boxes = splitBox([0, 0, 0], [0, 0, 39999]);
+    expect(boxes.every((b) => volume(b.lo, b.hi) <= 32768)).toBe(true);
+    expect(boxes.reduce((n, b) => n + volume(b.lo, b.hi), 0)).toBe(40000);
+  });
+  test("バックアップ置き場に重なる範囲は、何も実行せず断る", async () => {
+    const h = mk();
+    const r = await mutate(ctx(h), "fill", "t", ["fill 29000000 0 29000000 29000000 0 29000000 stone"], false);
+    expect(r.isError).toBe(true);
+    expect(r.text).toContain("重なっています");
+    expect(world.log).toEqual([]);
+  });
+  test("調べる範囲が作業用の置き場に重なるなら断る", async () => {
+    const box = { lo: [29_000_000, 0, 28_000_000] as [number, number, number], hi: [29_000_000, 1, 28_000_000] as [number, number, number] };
+    await expect(summarizeRegion(world, box, [29_000_000, 0, 28_000_000], ["stone"], wait)).rejects.toThrow("重なっています");
+    expect(world.log).toEqual([]);
+  });
+  test("ブロック名とタグの両方を求めたとき、数え終わっても後ろのタグを数える", async () => {
+    world.set(0, 0, 0, "oak_log");
+    const box = { lo: [0, 0, 0] as [number, number, number], hi: [0, 0, 0] as [number, number, number] };
+    const s = await summarizeRegion(world, box, [29_000_000, 0, 28_000_000], ["oak_log", "#minecraft:logs"], wait);
+    expect(s.counts.map(([k]) => k)).toContain("oak_log");
+    expect(world.log.some((c) => c.includes("#minecraft:logs"))).toBe(true);
+  });
+  test("戻した数が 0 なら履歴を残す", async () => {
+    const h = mk();
+    await mutate(ctx(h), "fill", "t", ["fill 0 0 0 1 0 1 stone"], false);
+    const orig = world.command.bind(world);
+    world.command = async (c: string) => (c.startsWith("clone 29000000") ? "Failed to clone" : orig(c));
+    const u = await undoOps(world, h, 1);
+    expect(u.isError).toBe(true);
+    expect(h.list().length).toBe(1);
+  });
+  test("同時に走る書き換えは1つずつ順に行い、退避が衝突しない", async () => {
+    const h = mk();
+    await Promise.all([
+      mutate(ctx(h), "fill", "a", ["fill 0 0 0 3 0 3 stone"], false),
+      mutate(ctx(h), "fill", "b", ["fill 10 0 0 13 0 3 glass"], false),
+    ]);
+    expect(h.list().length).toBe(2);
+    await undoOps(world, h, 2);
+    expect(world.get(0, 0, 0)).toBe("air");
+    expect(world.get(10, 0, 0)).toBe("air");
+  });
+  test("execute の入れ子は線形に処理し、say の本文は子コマンド扱いしない", () => {
+    const p = { allow: [], deny: ["stop"] };
+    expect(check(p, "execute as @a run say please run stop")).toBeNull();
+    expect(check(p, "execute as @a run stop")).not.toBeNull();
+    const deep = "execute as @a run ".repeat(300) + "say hi";
+    expect(effectiveCommands(deep).length).toBeLessThan(400);
   });
 });

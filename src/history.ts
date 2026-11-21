@@ -28,6 +28,7 @@ export type HistoryOpts = {
 };
 
 const align16 = (n: number) => Math.ceil(n / 16) * 16;
+const overlaps = (a: Box, b: Box) => [0, 1, 2].every((i) => a.lo[i]! <= b.hi[i]! && b.lo[i]! <= a.hi[i]!);
 const MAX_Z_SPAN = 800_000;
 
 export class History {
@@ -36,6 +37,14 @@ export class History {
   private file: string;
   private state: State | null = null;
   private wait: SleepFn;
+  private chain: Promise<unknown> = Promise.resolve();
+
+  /** 同じサーバーの退避・実行・undo を1つずつ順に行う（退避場所の取り合いを防ぐ） */
+  exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.chain.then(() => fn());
+    this.chain = run.catch(() => {});
+    return run;
+  }
 
   constructor(private o: HistoryOpts) {
     this.ox = Math.floor(o.origin[0] / 16) * 16;
@@ -74,6 +83,13 @@ export class History {
     });
     if (cursor > MAX_Z_SPAN)
       throw new Error("バックアップ置き場がいっぱいです。undo で履歴を戻すか、古い履歴の自動削除を待ってください");
+
+    // 書き換える範囲が、今回や残っている履歴の退避場所に重なると、退避が壊れるので始める前に断る
+    const destBox = (s: Slot): Box => ({ lo: s.dest, hi: this.destHi(s) });
+    const kept = [...slots, ...st.entries.flatMap((e) => e.slots)].map(destBox);
+    for (const s of slots)
+      if (kept.some((d) => overlaps(s.src, d)))
+        throw new Error(`書き換える範囲がバックアップ置き場（undo.origin 付近）と重なっています: ${s.src.lo.join(" ")} → ${s.src.hi.join(" ")}`);
 
     const done: Slot[] = [];
     try {
@@ -122,7 +138,8 @@ export class History {
       try {
         for (const s of [...e.slots].reverse()) {
           await forceload(raw, "add", s.dest, this.destHi(s));
-          await cloneCount(raw, s.dest, this.destHi(s), s.src.lo, "replace", this.wait);
+          const n = await cloneCount(raw, s.dest, this.destHi(s), s.src.lo, "replace", this.wait);
+          if (n === 0) throw new Error(`0 ブロックしか戻せませんでした: ${s.src.lo.join(" ")}`);
         }
       } catch (err) {
         return { restored, error: `#${e.id} を戻せませんでした（履歴は残してあります）: ${err instanceof Error ? err.message : err}` };

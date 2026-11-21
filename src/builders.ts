@@ -21,12 +21,18 @@ export function splitBox(a: Vec, b: Vec): Box[] {
     const layers = Math.max(1, Math.floor(FILL_LIMIT / (dx * dz)));
     for (let y = l[1]; y <= h[1]; y += layers)
       out.push({ lo: [l[0], y, l[2]], hi: [h[0], Math.min(h[1], y + layers - 1), h[2]] });
-  } else {
+  } else if (dz <= FILL_LIMIT) {
     // 底面が大きい場合は X 方向にも切る
     const step = Math.max(1, Math.floor(FILL_LIMIT / dz));
     for (let y = l[1]; y <= h[1]; y++)
       for (let x = l[0]; x <= h[0]; x += step)
         out.push({ lo: [x, y, l[2]], hi: [Math.min(h[0], x + step - 1), y, h[2]] });
+  } else {
+    // Z だけで上限を超える細長い範囲は、Z 方向にも切る
+    for (let y = l[1]; y <= h[1]; y++)
+      for (let x = l[0]; x <= h[0]; x++)
+        for (let z = l[2]; z <= h[2]; z += FILL_LIMIT)
+          out.push({ lo: [x, y, z], hi: [x, y, Math.min(h[2], z + FILL_LIMIT - 1)] });
   }
   return out;
 }
