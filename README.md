@@ -82,6 +82,7 @@ Every tool takes an optional `server` argument. `list_servers` shows what is reg
 | `MC_RCON_PORT` | `25575` | RCON port |
 | `MC_RCON_PASSWORD` | empty | RCON password |
 | `MC_MAX_VOLUME` | `200000` | Maximum number of blocks one operation may change |
+| `MC_MAX_PALETTE_BLOCKS` | `30000` | Maximum number of blocks one operation may mix with a palette |
 
 ## Settings file
 
@@ -142,6 +143,16 @@ Coordinates are absolute integers in the form `[x, y, z]`. Blocks accept block s
 
 Command syntax changes between Minecraft versions. For example, in 26.x `time query daytime` no longer exists and you use `time query day`. Let the AI read the error and retry, or ask it to check the command with `run_command` first.
 
+## Block palettes
+
+Where a tool takes `block` (`set_block`, `fill`, `build_sphere`, `build_cylinder`, `build_line`), you can pass a list instead of one name to mix blocks by ratio:
+
+```json
+{ "block": [{ "block": "stone_bricks", "weight": 70 }, { "block": "mossy_stone_bricks", "weight": 30 }], "seed": 1 }
+```
+
+`weight` is relative (it need not add up to 100). The same `seed` gives the same pattern, so a dry run and the real run match. A palette places blocks one by one (runs of the same block are merged into one `fill`), so it is capped by `MC_MAX_PALETTE_BLOCKS`. With `fill`, `mode` can be `replace`, `hollow`, or `outline`.
+
 ## Operation log
 
 Every call that runs or refuses commands is appended to `operations.jsonl` (one JSON object per line: time, server, tool, status, summary, command counts). By default it sits next to the undo history in `MC_STATE_DIR`, and each entry carries the history ID (`historyId`), so you can match a log line to an `undo` entry. The file is rotated to `operations.jsonl.1` at 5 MB.
@@ -180,6 +191,7 @@ pnpm start   # start the MCP server on stdio
 | `src/plan.ts` | Works out which blocks a command list changes |
 | `src/history.ts` | Backup before writing, and undo |
 | `src/ops.ts` | Shared flow for writes: policy, dry run, backup, run |
+| `src/palette.ts` | Mix blocks by ratio |
 | `src/oplog.ts` | Operation log file |
 | `src/inspect.ts` | Block counts for a region |
 | `src/config.ts` | Settings file |
@@ -190,7 +202,6 @@ pnpm start   # start the MCP server on stdio
 - More shapes: pyramid, arch, spiral stairs, roof, walls with windows
 - Paste a schematic (`.schem` / `.nbt`) at a position
 - Copy and paste a region, with rotation and flipping
-- Block palettes that mix blocks by ratio
 - Check block names per Minecraft version before running
 - Absorb command syntax differences between versions
 - Progress notifications during long builds

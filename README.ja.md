@@ -81,6 +81,7 @@ env = { MC_RCON_PASSWORD = "長くてランダムなパスワード" }
 | `MC_RCON_HOST` | `127.0.0.1` | サーバーのホスト |
 | `MC_RCON_PORT` | `25575` | RCON のポート |
 | `MC_RCON_PASSWORD` | 空 | RCON のパスワード |
+| `MC_MAX_PALETTE_BLOCKS` | `30000` | パレットで混ぜられる、1回の操作のブロック数の上限 |
 | `MC_MAX_VOLUME` | `200000` | 1回の操作で変えてよいブロック数の上限 |
 
 ## 設定ファイル
@@ -142,6 +143,16 @@ env = { MC_RCON_PASSWORD = "長くてランダムなパスワード" }
 
 コマンドの文法は Minecraft のバージョンで変わります。たとえば 26.x では `time query daytime` が使えず、`time query day` になっています。エラーを AI に読ませて再試行させるか、先に `run_command` で確認するよう頼んでください。
 
+## ブロックパレット
+
+`block` を取るツール(`set_block` `fill` `build_sphere` `build_cylinder` `build_line`)には、名前のかわりに配列を渡すと、割合でブロックを混ぜられます。
+
+```json
+{ "block": [{ "block": "stone_bricks", "weight": 70 }, { "block": "mossy_stone_bricks", "weight": 30 }], "seed": 1 }
+```
+
+`weight` は相対値で、合計が 100 でなくても構いません。`seed` が同じなら同じ並びになるので、ドライランと本番で結果が揃います。パレットは1ブロックずつ置くため(同じブロックが続く所は1つの `fill` にまとめます)、`MC_MAX_PALETTE_BLOCKS` で件数を制限しています。`fill` の `mode` は `replace` `hollow` `outline` が使えます。
+
 ## 操作ログ
 
 コマンドを実行した、または拒否した呼び出しは、すべて `operations.jsonl` に追記します(1行に1件の JSON。時刻、サーバー、ツール、結果、要約、コマンド数)。既定では `MC_STATE_DIR` の中で、元に戻す履歴と同じ場所にあります。各行に履歴の ID(`historyId`)が入るので、ログの行と `undo` の履歴を突き合わせられます。5 MB を超えると `operations.jsonl.1` に回します。
@@ -180,6 +191,7 @@ pnpm start   # MCP サーバーを起動(標準入出力で待ち受ける)
 | `src/plan.ts` | コマンド列が書き換えるブロックの範囲を求める |
 | `src/history.ts` | 書き込み前のバックアップと、元に戻す処理 |
 | `src/ops.ts` | 書き込みの共通の流れ(リスト判定、ドライラン、バックアップ、実行) |
+| `src/palette.ts` | 割合でブロックを混ぜる |
 | `src/oplog.ts` | 操作ログのファイル |
 | `src/inspect.ts` | 範囲内のブロックの集計 |
 | `src/config.ts` | 設定ファイル |
@@ -190,7 +202,6 @@ pnpm start   # MCP サーバーを起動(標準入出力で待ち受ける)
 - 形状の追加(ピラミッド、アーチ、らせん階段、屋根、窓つきの壁)
 - スキーマティック(`.schem` / `.nbt`)を指定の座標に貼る機能
 - 範囲のコピーと貼り付け(回転・反転つき)
-- 割合でブロックを混ぜるパレット
 - 実行前に、Minecraft のバージョンごとのブロック名を検証する機能
 - バージョンによるコマンド文法の違いの吸収
 - 長い建築の進捗通知
