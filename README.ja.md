@@ -2,22 +2,32 @@
 
 [English](README.md)
 
-Claude や Codex などの AI から、Minecraft Java 版のサーバーで建築やゲーム内の操作ができる MCP サーバーです。サーバーとは RCON でつなぐので、Mod は要りません。
+Claude や Codex などの AI から、Minecraft Java 版のサーバーで建築やゲーム内の操作ができる MCP サーバーです。RCON でつなぐので、Mod は要りません。
 
-```
-AI クライアント ──MCP (stdio)──▶ mc-ai-connection ──RCON──▶ Minecraft サーバー
-```
+![ブロックで建てた石レンガの大聖堂。未完成の屋根は琥珀色のワイヤーフレームで残してある](docs/images/hero.png)
 
-「Steve の隣に石レンガの塔を建てて」「原点に半径 10 のガラスのドームをかぶせて」と頼むと、AI がコマンドに変えて実行します。Minecraft 26.3 の Paper サーバーで試しており、約 700 コマンドの大聖堂も建てられました。
+「Steve の隣に石レンガの塔を建てて」「原点に半径 10 のガラスのドームをかぶせて」と頼むと、AI がサーバーのコマンドに変えて実行します。
 
-## 必要なもの
+## 特長
 
-- [Bun](https://bun.sh) と [pnpm](https://pnpm.io)
-- RCON を有効にした Minecraft Java 版のサーバー
+- 形状: `fill`、球、円柱、直線、ピラミッド、アーチ、らせん階段、屋根、窓つきの壁。広い範囲は、`/fill` の上限 32768 ブロックに収まるよう自動で分割します。
+- パレット: 割合でブロックを混ぜます。`seed` を揃えれば、ドライランと本番の結果が一致します。
+- スキマティックとコピー: `.schem`(Sponge v2/v3)と構造物の `.nbt` を貼り付けられます。範囲のコピーでは、回転と反転ができます。
+- 元に戻す: `set_block` `fill` `build_*` は、書き込む前にバックアップを取り、新しい順に戻せます。
+- ドライラン: 実行前に、コマンド数、変わりうる最大のブロック数、範囲を返します。
+- バージョン検査: `version` を書くと、書き込む前にブロック名、名前の変更、高さを検査します。
+- 複数のサーバーに対応し、SSH トンネルも使えます。
+- コマンドの制限と操作ログ: `stop` `op` `ban` などの危険なコマンドは、既定で拒否します。
 
-## セットアップ
+### 検証の範囲
 
-### 1. インストール
+単体テスト(`pnpm test`)は、サーバーなしの疑似ワールドで動かします。実際のサーバーでの動作確認は、作者が Minecraft 26.3 の Paper サーバーで行ったものだけです。約 700 コマンドの大聖堂も建てられました。ほかのサーバーソフトやバージョンは未検証です。カメラ、移動、スクリーンショットなど、クライアント側の操作は対象外です。
+
+## 最短セットアップ
+
+[Bun](https://bun.sh)、[pnpm](https://pnpm.io)、RCON を有効にした Minecraft Java 版のサーバーが要ります。
+
+**1. インストール**
 
 ```sh
 git clone https://github.com/Lapius7/mc-ai-connection
@@ -25,40 +35,79 @@ cd mc-ai-connection
 pnpm install
 ```
 
-### 2. サーバーで RCON を有効にする
-
-`server.properties` に次を書き、サーバーを再起動します。
+**2. RCON を有効にする。** `server.properties` に書き、サーバーを再起動します。
 
 ```properties
 enable-rcon=true
 rcon.port=25575
-rcon.password=長くてランダムなパスワード
+rcon.password=use-a-long-random-password
 ```
 
-### 3. AI クライアントに登録する
-
-Claude Code の場合です。
+**3. AI クライアントに登録する。** Claude Code では次を実行します。
 
 ```sh
 claude mcp add mc \
-  -e MC_RCON_PASSWORD=長くてランダムなパスワード \
-  -- bun run /絶対パス/mc-ai-connection/src/index.ts
+  -e MC_RCON_PASSWORD=use-a-long-random-password \
+  -- bun run /absolute/path/to/mc-ai-connection/src/index.ts
 ```
 
-Codex の場合は、`~/.codex/config.toml` に追記します。
+Codex では `~/.codex/config.toml` に次を書きます。
 
 ```toml
 [mcp_servers.mc]
 command = "bun"
-args = ["run", "/絶対パス/mc-ai-connection/src/index.ts"]
-env = { MC_RCON_PASSWORD = "長くてランダムなパスワード" }
+args = ["run", "/absolute/path/to/mc-ai-connection/src/index.ts"]
+env = { MC_RCON_PASSWORD = "use-a-long-random-password" }
 ```
 
-ほかの MCP クライアントでも、標準入出力(stdio)で `bun run src/index.ts` を起動できれば使えます。
+標準入出力で `bun run src/index.ts` を起動できる MCP クライアントなら、ほかでも使えます。
 
-### 4. 試す
+**4. 試す。** サーバーを起動して、AI に「オンラインのプレイヤーを教えて」「Steve はどこにいる?」と頼みます。
 
-サーバーを起動してから、AI に「オンラインのプレイヤーを教えて」「Steve はどこにいる?」と頼んでください。
+## ツール
+
+| ツール | 内容 |
+|---|---|
+| `list_servers` | 登録済みのサーバーと、現在の既定を一覧する |
+| `use_server` | 既定のサーバーを切り替える |
+| `run_command` | コマンドを1つ実行し、出力を返す。先頭の `/` は省略できる |
+| `run_commands` | コマンドを順に最大 2000 件実行する |
+| `get_player_pos` | プレイヤーの座標、向き、ディメンションを返す |
+| `set_block` | ブロックを1つ置く |
+| `fill` | 直方体を埋める。`mode` は `replace` `hollow` `outline` `keep` `destroy`。32768 ブロックの上限を超える範囲は自動で分割する |
+| `build_sphere` | 球を作る(半径 1〜60)。空洞にもできる |
+| `build_cylinder` | 円柱を作る(半径 1〜60、高さ 1〜320)。空洞にもできる |
+| `build_line` | 2点の間に3次元の直線を引く |
+| `build_pyramid` | 四角錐(中を空けることもできる) |
+| `build_arch` | 半円のアーチ(脚の高さ・厚み・奥行きを指定) |
+| `build_spiral_stairs` | らせん階段(中心の柱は任意。1段ごとに1ブロック上がる) |
+| `build_roof` | 切妻または寄棟の屋根。`stairBlock` を渡すと切妻の傾斜を向きつきの階段で作る |
+| `copy_region` | 範囲を別の場所へコピー(90 度刻みの回転と x / z 反転つき。サーバー側の `clone` で、ブロックの向きは回転しない) |
+| `paste_schematic` | `.schem`(Sponge v2/v3)またはストラクチャーの `.nbt` を指定の座標に貼る(チェストの中身などブロックエンティティの NBT は貼らない) |
+| `build_walls` | 四方の壁に、等間隔の窓と出入口の開口(空気。ドアのブロックは置かない)をまとめて作る |
+| `undo` | 直前の書き込みを元に戻す(`steps` で件数を指定)。新しい順にだけ戻せる |
+| `list_history` | `undo` で戻せる書き込みを、サーバーごとに一覧する |
+| `operation_log` | 直近の操作ログを返す(実行、ドライラン、拒否、失敗、undo) |
+| `inspect_region` | 範囲内のブロックを種類ごとに数える(読み取りのみ) |
+
+`set_block` `fill` `build_*` には `dryRun: true` を渡せます。何も実行せず、コマンド数、変わりうる最大のブロック数、範囲だけを返します。
+
+座標は `[x, y, z]` の整数の絶対座標です。ブロックは `oak_stairs[facing=north]` のように状態も指定できます。形状ツールはすべての応答を返さず、実行数・成功数・失敗の例だけを返します。
+
+`run_command` はサーバーのコンソールで打てるコマンドをすべて実行できます。時刻、天気、ゲームルール、エンティティの変更、アイテムの付与、テレポートなども AI に頼めます。
+
+## AI が建てる流れ
+
+1. `get_player_pos` で基準の座標を調べます。
+2. `fill` や `build_sphere` などで形を作り、細部は `run_commands` で大量のコマンドを送ります。
+3. `execute if block x y z <ブロック>` で結果を確かめます。「Test passed」か「Test failed」が返ります。
+
+## 安全のために
+
+- RCON は暗号化されず、サーバーを完全に操作できます。RCON のポートをインターネットに公開しないでください。長いパスワードとファイアウォールを使ってください。
+- `stop` `op` `ban` などのコマンドは、既定で拒否します(設定ファイルを参照)。自分のサーバーにだけつないでください。AI にさせたくないことが多いなら、`commands.allow` で絞ります。
+- `undo` で戻せるのは `set_block` `fill` `build_*` だけです。大きな建築の前と、`run_command` で行う操作の前には、ワールドのバックアップを取ってください。上限を超える1回の操作は `MC_MAX_VOLUME` で断ります。
+- 使えるのはサーバー側のコマンドだけです。視点、移動、スクリーンショットなどのクライアント側の操作はできません。
 
 ## 複数のサーバー
 
@@ -103,55 +152,6 @@ env = { MC_RCON_PASSWORD = "長くてランダムなパスワード" }
 
 リストが効くのは、利用者や AI が頼んだコマンドです。`run_command`、`run_commands`、`fill` や `build_*` が作るコマンドが対象で、`execute ... run <コマンド>` の `run` 以降も含みます。MCP が内部で使うコマンド(undo と `inspect_region` の `clone` と `forceload`、`get_player_pos` の `data get`)は検査しません。そのため `clone` を禁止しても undo は壊れません。履歴は `MC_STATE_DIR`(既定は `~/.local/state/mc-ai-connection`)に保存します。
 
-## ツール
-
-| ツール | 内容 |
-|---|---|
-| `list_servers` | 登録済みのサーバーと、現在の既定を一覧する |
-| `use_server` | 既定のサーバーを切り替える |
-| `run_command` | コマンドを1つ実行し、出力を返す。先頭の `/` は省略できる |
-| `run_commands` | コマンドを順に最大 2000 件実行する |
-| `get_player_pos` | プレイヤーの座標、向き、ディメンションを返す |
-| `set_block` | ブロックを1つ置く |
-| `fill` | 直方体を埋める。`mode` は `replace` `hollow` `outline` `keep` `destroy`。32768 ブロックの上限を超える範囲は自動で分割する |
-| `build_sphere` | 球を作る(半径 1〜60)。空洞にもできる |
-| `build_cylinder` | 円柱を作る(半径 1〜60、高さ 1〜320)。空洞にもできる |
-| `build_line` | 2点の間に3次元の直線を引く |
-| `build_pyramid` | 四角錐(中を空けることもできる) |
-| `build_arch` | 半円のアーチ(脚の高さ・厚み・奥行きを指定) |
-| `build_spiral_stairs` | らせん階段(中心の柱は任意。1段ごとに1ブロック上がる) |
-| `build_roof` | 切妻または寄棟の屋根。`stairBlock` を渡すと切妻の傾斜を向きつきの階段で作る |
-| `copy_region` | 範囲を別の場所へコピー(90 度刻みの回転と x / z 反転つき。サーバー側の `clone` で、ブロックの向きは回転しない) |
-| `paste_schematic` | `.schem`(Sponge v2/v3)またはストラクチャーの `.nbt` を指定の座標に貼る(チェストの中身などブロックエンティティの NBT は貼らない) |
-| `build_walls` | 四方の壁に、等間隔の窓と出入口の開口(空気。ドアのブロックは置かない)をまとめて作る |
-| `undo` | 直前の書き込みを元に戻す(`steps` で件数を指定)。新しい順にだけ戻せる |
-| `list_history` | `undo` で戻せる書き込みを、サーバーごとに一覧する |
-| `operation_log` | 直近の操作ログを返す(実行、ドライラン、拒否、失敗、undo) |
-| `inspect_region` | 範囲内のブロックを種類ごとに数える(読み取りのみ) |
-
-`set_block` `fill` `build_*` には `dryRun: true` を渡せます。何も実行せず、コマンド数、変わりうる最大のブロック数、範囲だけを返します。
-
-座標は `[x, y, z]` の整数の絶対座標です。ブロックは `oak_stairs[facing=north]` のように状態も指定できます。形状ツールはすべての応答を返さず、実行数・成功数・失敗の例だけを返します。
-
-`run_command` はサーバーのコンソールで打てるコマンドをすべて実行できます。時刻、天気、ゲームルール、エンティティの変更、アイテムの付与、テレポートなども AI に頼めます。
-
-## AI が建てる流れ
-
-1. `get_player_pos` で基準の座標を調べます。
-2. `fill` や `build_sphere` などで形を作り、細部は `run_commands` で大量のコマンドを送ります。
-3. `execute if block x y z <ブロック>` で結果を確かめます。「Test passed」か「Test failed」が返ります。
-
-## トラブルシューティング
-
-**`Failed to connect` と出る**
-
-- サーバーが起動していないか、RCON が無効です。`enable-rcon=true` を設定し、再起動したか確認してください。
-- ホストが違います。サーバーが Windows 側にあり、AI が WSL2 にある場合は、`127.0.0.1` で届かないことがあります。`ip route show default` で分かる Windows 側のホスト IP を `MC_RCON_HOST` に設定するか、WSL をミラーモード(`.wslconfig` に `networkingMode=mirrored`)にしてください。
-
-**コマンドの文法エラーが出る**
-
-コマンドの文法は Minecraft のバージョンで変わります。たとえば 26.x では `time query daytime` が使えず、`time query day` になっています。エラーを AI に読ませて再試行させるか、先に `run_command` で確認するよう頼んでください。
-
 ## バージョン
 
 サーバーに `version` を書くと、書き込み系のツール(`set_block` `fill` `build_*` `copy_region` `paste_schematic`)が、何かを書く前にコマンドを検査します。ドライランでも同じ結果が出ます。
@@ -162,10 +162,6 @@ env = { MC_RCON_PASSWORD = "長くてランダムなパスワード" }
 
 `run_command` と `run_commands` は読み替えず、書いたとおりに送ります。`version` がなければ何も検査しません。バージョンはサーバーから取りません(RCON に標準のコマンドがないため)。
 
-## 進捗通知
-
-時間のかかる操作(書き込み系のツールと `run_commands`)では、コマンドの実行中に MCP の `notifications/progress` を送ります。間隔はおよそ全体の 5% ごと、または 1 秒ごとです。呼び出しに `progressToken` を付けるクライアントだけが受け取ります。付けないクライアントには影響しません。数えるのはブロック数ではなくコマンド数です。書き込み前の退避の間は、進捗を送りません。
-
 ## ブロックパレット
 
 `block` を取るツール(`set_block` `fill` `build_sphere` `build_cylinder` `build_line`)には、名前のかわりに配列を渡すと、割合でブロックを混ぜられます。
@@ -175,6 +171,10 @@ env = { MC_RCON_PASSWORD = "長くてランダムなパスワード" }
 ```
 
 `weight` は相対値で、合計が 100 でなくても構いません。`seed` が同じなら同じ並びになるので、ドライランと本番で結果が揃います。パレットは1ブロックずつ置くため(同じブロックが続く所は1つの `fill` にまとめます)、`MC_MAX_PALETTE_BLOCKS` で件数を制限しています。`fill` の `mode` は `replace` `hollow` `outline` が使えます。
+
+## 進捗通知
+
+時間のかかる操作(書き込み系のツールと `run_commands`)では、コマンドの実行中に MCP の `notifications/progress` を送ります。間隔はおよそ全体の 5% ごと、または 1 秒ごとです。呼び出しに `progressToken` を付けるクライアントだけが受け取ります。付けないクライアントには影響しません。数えるのはブロック数ではなくコマンド数です。書き込み前の退避の間は、進捗を送りません。
 
 ## 操作ログ
 
@@ -190,12 +190,16 @@ env = { MC_RCON_PASSWORD = "長くてランダムなパスワード" }
 - `run_command` と `run_commands` は**対象外**です。任意のコマンドが何を変えるかは MCP には分からないためです。あとで戻したい部分は `fill` や `build_*` で作ってください。
 - エンティティ(モブやドロップアイテム)は保存しません。
 
-## 安全のために
+## トラブルシューティング
 
-- RCON は暗号化されず、サーバーを完全に操作できます。RCON のポートをインターネットに公開しないでください。長いパスワードとファイアウォールを使ってください。
-- `stop` `op` `ban` などのコマンドは、既定で拒否します(設定ファイルを参照)。自分のサーバーにだけつないでください。AI にさせたくないことが多いなら、`commands.allow` で絞ります。
-- `undo` で戻せるのは `set_block` `fill` `build_*` だけです。大きな建築の前と、`run_command` で行う操作の前には、ワールドのバックアップを取ってください。上限を超える1回の操作は `MC_MAX_VOLUME` で断ります。
-- 使えるのはサーバー側のコマンドだけです。視点、移動、スクリーンショットなどのクライアント側の操作はできません。
+**`Failed to connect` と出る**
+
+- サーバーが起動していないか、RCON が無効です。`enable-rcon=true` を設定し、再起動したか確認してください。
+- ホストが違います。サーバーが Windows 側にあり、AI が WSL2 にある場合は、`127.0.0.1` で届かないことがあります。`ip route show default` で分かる Windows 側のホスト IP を `MC_RCON_HOST` に設定するか、WSL をミラーモード(`.wslconfig` に `networkingMode=mirrored`)にしてください。
+
+**コマンドの文法エラーが出る**
+
+コマンドの文法は Minecraft のバージョンで変わります。たとえば 26.x では `time query daytime` が使えず、`time query day` になっています。エラーを AI に読ませて再試行させるか、先に `run_command` で確認するよう頼んでください。
 
 ## 開発
 
