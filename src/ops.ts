@@ -38,7 +38,13 @@ export async function runPlain(rcon: Runner, policy: Policy, cmds: string[]): Pr
 export type MutateCtx = { rcon: Runner; policy: Policy; settings: Settings; history: History };
 
 /** fill / build_* / set_block 用。実行前に元ブロックを退避し、履歴に積む */
-export async function mutate(
+export function mutate(
+  ctx: MutateCtx, tool: string, desc: string, cmds: string[], dryRun: boolean,
+): Promise<Result> {
+  return ctx.history.exclusive(() => mutateNow(ctx, tool, desc, cmds, dryRun));
+}
+
+async function mutateNow(
   ctx: MutateCtx, tool: string, desc: string, cmds: string[], dryRun: boolean,
 ): Promise<Result> {
   const d = denied(ctx.policy, cmds);
@@ -73,7 +79,11 @@ export async function mutate(
   }
 }
 
-export async function undoOps(rcon: Runner, history: History, steps: number): Promise<Result> {
+export function undoOps(rcon: Runner, history: History, steps: number): Promise<Result> {
+  return history.exclusive(() => undoNow(rcon, history, steps));
+}
+
+async function undoNow(rcon: Runner, history: History, steps: number): Promise<Result> {
   if (history.list().length === 0) return err("戻せる履歴がありません");
   const r = await history.undo(rcon, steps);
   const lines = r.restored.map(entryLine);
