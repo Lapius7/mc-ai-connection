@@ -8,7 +8,7 @@ import { loadSettings } from "./config.ts";
 import { FakeWorld } from "./fakeWorld.ts";
 import { History } from "./history.ts";
 import { formatSummary, summarizeRegion } from "./inspect.ts";
-import { listOps, logOps, mutate, runPlain, undoOps } from "./ops.ts";
+import { listOps, logOps, mutate, runPlain, throttled, undoOps } from "./ops.ts";
 import { OpLog } from "./oplog.ts";
 import { check, DEFAULT_DENY, effectiveCommands } from "./policy.ts";
 
@@ -210,6 +210,40 @@ describe("操作ログ", () => {
     const log = new OpLog(f);
     log.append({ server: "s", tool: "t", status: "done", summary: "x" });
     expect(log.tail(5).length).toBe(1);
+  });
+});
+
+describe("進捗通知", () => {
+  test("throttled は 5% ごとに送り、最後は必ず送る", async () => {
+    const seen: number[] = [];
+    const t = throttled((d) => { seen.push(d); }, 100, () => 0);
+    for (let i = 1; i <= 100; i++) await t(i, 100);
+    expect(seen).toEqual([5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]);
+  });
+  test("1秒たてば間隔の途中でも送る", async () => {
+    const seen: number[] = [];
+    let now = 0;
+    const t = throttled((d) => { seen.push(d); }, 1000, () => now);
+    await t(1, 1000);
+    now = 1500;
+    await t(2, 1000);
+    expect(seen).toEqual([2]);
+  });
+  test("mutate は実行中に進捗を報告する。コマンドが1つなら報告しない", async () => {
+    const h = mk();
+    const seen: [number, number][] = [];
+    const c = { ...ctx(h), progress: (d: number, t: number) => { seen.push([d, t]); } };
+    await mutate(c, "fill", "t", fillCmds([0, 0, 0], [40, 40, 40], "stone"), false);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.at(-1)).toEqual([seen.at(-1)![1], seen.at(-1)![1]]);
+    seen.length = 0;
+    await mutate(c, "set_block", "t", ["setblock 0 0 0 dirt"], false);
+    expect(seen).toEqual([]);
+  });
+  test("runPlain も進捗を報告する", async () => {
+    const seen: number[] = [];
+    await runPlain(world, { allow: [], deny: DEFAULT_DENY }, Array.from({ length: 40 }, (_, i) => `setblock ${i} 0 0 dirt`), undefined, (d) => { seen.push(d); });
+    expect(seen.at(-1)).toBe(40);
   });
 });
 
