@@ -35,10 +35,13 @@ export async function summarizeRegion(
   const destFor = (c: Box): Vec => [scratch[0], c.lo[1], scratch[2]];
   const destHi = (c: Box): Vec => [scratch[0] + dim(0) - 1, c.hi[1], scratch[2] + dim(2) - 1];
   const used = chunks.map((c) => ({ lo: destFor(c), hi: destHi(c) }));
+  // 作業用のコピー先が調べる範囲に重なると、終わりの後始末でその範囲のブロックを消してしまう
+  if (used.some((u) => [0, 1, 2].every((i) => u.lo[i]! <= box.hi[i]! && box.lo[i]! <= u.hi[i]!)))
+    throw new Error("調べる範囲が作業用の置き場（undo.origin 付近）と重なっています");
 
   try {
     for (const u of used) await forceload(rcon, "add", u.lo, u.hi);
-    for (const name of names) {
+    for (const [idx, name] of names.entries()) {
       let n = 0;
       for (const c of chunks) n += await cloneCount(rcon, c.lo, c.hi, destFor(c), `filtered ${name}`, wait);
       if (n > 0) {
@@ -46,7 +49,8 @@ export async function summarizeRegion(
         // タグは重複して数えうるので、ブロック名のときだけ「残り」の計算に使う
         if (!name.startsWith("#")) found += n;
       }
-      if (found >= total) break;
+      // 数え終わっていても、残りにタグ（重複して数えうる）があれば続ける
+      if (found >= total && names.slice(idx + 1).every((x) => !x.startsWith("#"))) break;
     }
   } finally {
     for (const u of used) {
