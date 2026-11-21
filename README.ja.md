@@ -99,7 +99,7 @@ env = { MC_RCON_PASSWORD = "長くてランダムなパスワード" }
 | `undo.origin` | `[29000000, 29000000]` | バックアップ置き場の `[x, z]`(「元に戻す」を参照)。ワールドボーダーの内側にしてください |
 | `undo.maxVolume` | `2000000` | 1回の操作でバックアップできる最大のブロック数 |
 
-リストは、この MCP が送るすべてのコマンドに効きます。`fill` や `build_*` が作るコマンドも、`execute ... run <コマンド>` の `run` 以降も対象です。履歴は `MC_STATE_DIR`(既定は `~/.local/state/mc-ai-connection`)に保存します。
+リストが効くのは、利用者や AI が頼んだコマンドです。`run_command`、`run_commands`、`fill` や `build_*` が作るコマンドが対象で、`execute ... run <コマンド>` の `run` 以降も含みます。MCP が内部で使うコマンド(undo と `inspect_region` の `clone` と `forceload`、`get_player_pos` の `data get`)は検査しません。そのため `clone` を禁止しても undo は壊れません。履歴は `MC_STATE_DIR`(既定は `~/.local/state/mc-ai-connection`)に保存します。
 
 ## ツール
 
